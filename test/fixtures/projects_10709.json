@@ -1,0 +1,127 @@
+{
+ "id": 10709,
+ "createdAt": "2024-06-22T13:55:24.783Z",
+ "updatedAt": "2026-10-18T16:15:04.365Z",
+ "uid": 1,
+ "name": "Translate ParaTranz!",
+ "logo": "/media/example-logo.png",
+ "desc": "示例项目描述",
+ "source": "zh-cn",
+ "dest": "other",
+ "members": 72,
+ "game": "other",
+ "license": "by-4.0",
+ "abuse": 0,
+ "activeLevel": 0.9,
+ "rank": 1,
+ "privacy": 0,
+ "stage": 1,
+ "extra": {
+  "link": "",
+  "isMod": false,
+  "credit": "",
+  "joinMode": 0,
+  "issueMode": 0,
+  "termsMode": 0,
+  "compatible": "",
+  "creditLink": "",
+  "reviewMode": 0,
+  "downloadMode": 1,
+  "contextFormat": "",
+  "hasTranslation": false
+ },
+ "owner": {
+  "id": 1,
+  "username": "example-user-900001",
+  "nickname": "示例用户900001",
+  "avatar": "/media/example-avatar.png",
+  "lastVisit": "2026-01-01T00:00:00.000Z"
+ },
+ "stats": {
+  "id": 10709,
+  "deletedAt": null,
+  "rank": 1,
+  "modifiedAt": "2026-10-17T02:38:37.156Z",
+  "total": 14650,
+  "translated": 14627,
+  "disputed": 8,
+  "checked": 0,
+  "reviewed": 0,
+  "hidden": 0,
+  "locked": 0,
+  "words": 101520,
+  "members": 72,
+  "tp": 0.9984,
+  "cp": 0,
+  "rp": 0
+ },
+ "isPrivate": false,
+ "gameName": "Other",
+ "formats": {
+  "csv": "csv",
+  "json": "json",
+  "ini": "ini",
+  "tmx": "tmx",
+  "txt": "txt",
+  "po": "po",
+  "pot": "po",
+  "mqxliff": "mqxliff"
+ },
+ "download": 1,
+ "joinMode": 0,
+ "issueMode": 0,
+ "reviewMode": 0,
+ "announcementsCount": 1,
+ "filesCount": 10,
+ "applicationsCount": 0,
+ "termsCount": 0,
+ "issuesCount": 4,
+ "tagRules": [
+  {
+   "type": 2,
+   "source": "</[^>]+?>"
+  },
+  {
+   "type": 0,
+   "source": "%{\\d}[a-z]"
+  },
+  {
+   "type": 0,
+   "source": "@[\\w.]+?@"
+  },
+  {
+   "type": 9,
+   "string": "\n"
+  },
+  {
+   "source": "{\\w+}",
+   "type": 0,
+   "predefined": true
+  },
+  {
+   "source": "%[ds]?\\d",
+   "type": 0,
+   "predefined": true
+  },
+  {
+   "source": "</[^<>]+>",
+   "type": 2,
+   "predefined": true
+  },
+  {
+   "source": "<[^<>]+>",
+   "type": 1,
+   "predefined": true
+  },
+  {
+   "source": "%{\\d}[a-z]",
+   "type": 0,
+   "predefined": true
+  },
+  {
+   "source": "@[\\w.]+?@",
+   "type": 0,
+   "predefined": true
+  }
+ ]
+}

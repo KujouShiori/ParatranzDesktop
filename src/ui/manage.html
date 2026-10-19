@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>屏蔽管理</title>
+  <link rel="stylesheet" href="manage.css">
+</head>
+<body>
+  <header>
+    <h1>屏蔽管理</h1>
+    <label class="reveal-all">
+      <input type="checkbox" id="revealAll">
+      <span>临时显示所有被屏蔽内容（重启后自动恢复）</span>
+    </label>
+  </header>
+
+  <section>
+    <h2>屏蔽的项目</h2>
+    <div class="add-row">
+      <input type="text" id="projectId" placeholder="项目 ID，例如 10709">
+      <input type="text" id="projectName" placeholder="备注名（可留空）">
+      <button id="addProject">添加</button>
+    </div>
+    <table id="projectTable">
+      <thead><tr><th>名称</th><th>ID</th><th>加入时间</th><th>操作</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="projectEmpty">还没有屏蔽任何项目。</p>
+  </section>
+
+  <section>
+    <h2>屏蔽的用户</h2>
+    <div class="add-row">
+      <input type="text" id="userId" placeholder="用户 ID">
+      <input type="text" id="userName" placeholder="或用户名 username">
+      <button id="addUser">添加</button>
+    </div>
+    <table id="userTable">
+      <thead><tr><th>用户名</th><th>ID</th><th>加入时间</th><th>操作</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="userEmpty">还没有屏蔽任何用户。</p>
+  </section>
+
+  <section>
+    <h2>账号窗口</h2>
+    <div class="add-row">
+      <input type="text" id="accountName" placeholder="新账号备注名">
+      <button id="addAccount">新增账号</button>
+    </div>
+    <ul id="accountList"></ul>
+    <p class="hint">每个账号有独立的登录状态窗口，互不干扰；屏蔽名单是全局共用的。</p>
+  </section>
+
+  <section>
+    <h2>提醒与行为</h2>
+    <label><input type="checkbox" id="notifyOn"> 新消息 / 被审核时弹系统通知</label>
+    <label>通知轮询间隔
+      <select id="notifyInterval">
+        <option value="20">20 秒</option>
+        <option value="45">45 秒</option>
+        <option value="90">90 秒</option>
+        <option value="300">5 分钟</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="closeToTray"> 关闭主窗口时留在托盘</label>
+    <label><input type="checkbox" id="dumpShapes"> 记录接口原始结构（调试用，写入设置目录 shape-dump）</label>
+  </section>
+
+  <footer>
+    <button id="export">导出名单</button>
+    <button id="import">导入名单</button>
+    <button id="openSite">打开 Paratranz</button>
+    <span id="status"></span>
+  </footer>
+
+  <script src="manage.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "name": "paratranz-desktop",
+  "productName": "Paratranz Desktop",
+  "version": "0.1.0",
+  "description": "paratranz.cn 桌面客户端：完整翻译工作台 + 项目/用户屏蔽层",
+  "private": true,
+  "main": "src/main/index.js",
+  "author": "KujouShiori",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "test": "node test/run.js && node test/loader.js && node test/engine.js && node test/fetch.js && node test/notify.js && node test/parity.js",
+    "dist": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "cn.paratranz.desktop",
+    "productName": "Paratranz Desktop",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "ParatranzDesktop-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "artifactName": "ParatranzDesktop-${version}-installer.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3"
+  }
+}

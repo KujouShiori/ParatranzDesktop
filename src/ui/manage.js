@@ -1,0 +1,183 @@
+'use strict'
+
+const $ = (id) => document.getElementById(id)
+let snap = null
+
+function status(text, isError) {
+  const el = $('status')
+  el.textContent = text
+  el.className = isError ? 'err' : ''
+  if (text) setTimeout(() => { if (el.textContent === text) el.textContent = '' }, 4000)
+}
+
+function time(v) {
+  if (!v) return ''
+  return new Date(v).toLocaleString('zh-CN', { hour12: false })
+}
+
+function userKey(u) {
+  return u.id ? 'id:' + u.id : 'name:' + String(u.username || '').toLowerCase()
+}
+
+function isRevealed(kind, key) {
+  if (!snap) return false
+  if (snap.reveal.all) return true
+  if (kind === 'project') return snap.reveal.projectIds.includes(Number(key))
+  return snap.reveal.userKeys.includes(key)
+}
+
+function renderProjects() {
+  const tbody = $('projectTable').querySelector('tbody')
+  tbody.textContent = ''
+  const list = (snap && snap.blocklist.projects) || []
+  $('projectEmpty').classList.toggle('hidden', list.length > 0)
+  for (const p of list) {
+    const tr = document.createElement('tr')
+    if (isRevealed('project', p.id)) tr.className = 'revealed'
+    const name = td('name')
+    if (p.url) {
+      const a = document.createElement('a')
+      a.href = '#'
+      a.textContent = p.name || ('项目 ' + p.id)
+      a.addEventListener('click', (e) => { e.preventDefault(); api.openSite({ url: p.url }) })
+      name.appendChild(a)
+    } else {
+      name.textContent = p.name || ('项目 ' + p.id)
+    }
+    tr.appendChild(name)
+    tr.appendChild(td(String(p.id)))
+    tr.appendChild(td(time(p.addedAt)))
+    const ops = td('ops')
+    ops.appendChild(button(isRevealed('project', p.id) ? '已临时显示' : '临时显示', 'ghost', () => api.revealProject(p.id).then(apply)))
+    ops.appendChild(button('删除', 'ghost', () => api.removeProject(p.id)))
+    tr.appendChild(ops)
+    tbody.appendChild(tr)
+  }
+}
+
+function renderUsers() {
+  const tbody = $('userTable').querySelector('tbody')
+  tbody.textContent = ''
+  const list = (snap && snap.blocklist.users) || []
+  $('userEmpty').classList.toggle('hidden', list.length > 0)
+  for (const u of list) {
+    const tr = document.createElement('tr')
+    const key = userKey(u)
+    if (isRevealed('user', key)) tr.className = 'revealed'
+    tr.appendChild(td(u.username || '(仅按 ID 屏蔽)', 'name'))
+    tr.appendChild(td(String(u.id || '')))
+    tr.appendChild(td(time(u.addedAt)))
+    const ops = td('ops')
+    ops.appendChild(button(isRevealed('user', key) ? '已临时显示' : '临时显示', 'ghost', () => api.revealUser(key).then(apply)))
+    ops.appendChild(button('删除', 'ghost', () => api.removeUser(key)))
+    tr.appendChild(ops)
+    tbody.appendChild(tr)
+  }
+}
+
+function renderAccounts() {
+  const ul = $('accountList')
+  ul.textContent = ''
+  const list = (snap && snap.accounts) || []
+  if (!list.length) {
+    const li = document.createElement('li')
+    li.textContent = '当前只有默认窗口。新增账号后可以同时登录多个账号并行翻译。'
+    li.className = 'empty'
+    ul.appendChild(li)
+  }
+  for (const a of list) {
+    const li = document.createElement('li')
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.value = a.name
+    input.addEventListener('change', () => api.accountRename({ id: a.id, name: input.value }))
+    li.appendChild(input)
+    li.appendChild(button('打开窗口', '', () => api.openSite({ account: a.id })))
+    li.appendChild(button('删除', 'ghost', () => {
+      if (!confirm('删除账号「' + a.name + '」？该账号的登录状态会一并清除。')) return
+      api.accountRemove(a.id)
+    }))
+    ul.appendChild(li)
+  }
+}
+
+function renderSettings() {
+  const s = (snap && snap.settings) || {}
+  $('revealAll').checked = !!(snap && snap.reveal && snap.reveal.all)
+  $('notifyOn').checked = s.notifications !== false
+  $('notifyInterval').value = String(s.notifyIntervalSec || 45)
+  $('closeToTray').checked = s.closeToTray !== false
+  $('dumpShapes').checked = !!s.dumpShapes
+}
+
+function apply(next) {
+  if (next) snap = next
+  renderProjects()
+  renderUsers()
+  renderAccounts()
+  renderSettings()
+}
+
+function td(text, cls) {
+  const el = document.createElement('td')
+  el.textContent = text == null ? '' : String(text)
+  if (cls) el.className = cls
+  return el
+}
+
+function button(label, cls, onClick) {
+  const b = document.createElement('button')
+  b.textContent = label
+  if (cls) b.className = cls
+  b.addEventListener('click', onClick)
+  return b
+}
+
+const api = window.ptManage
+
+function wire() {
+  $('revealAll').addEventListener('change', (e) => api.setRevealAll(e.target.checked).then(apply))
+  $('addProject').addEventListener('click', () => {
+    const id = Number($('projectId').value.trim())
+    if (!Number.isFinite(id) || id <= 0) return status('请输入数字项目 ID', true)
+    const res = api.addProject({ id: id, name: $('projectName').value.trim() })
+    Promise.resolve(res).then((r) => {
+      if (r && !r.ok) status(r.error, true)
+      else { $('projectId').value = ''; $('projectName').value = ''; status('已加入屏蔽名单') }
+    })
+  })
+  $('addUser').addEventListener('click', () => {
+    const id = Number($('userId').value.trim())
+    const name = $('userName').value.trim()
+    const res = api.addUser({ id: Number.isFinite(id) && id > 0 ? id : null, username: name })
+    Promise.resolve(res).then((r) => {
+      if (r && !r.ok) status(r.error, true)
+      else { $('userId').value = ''; $('userName').value = ''; status('已加入屏蔽名单') }
+    })
+  })
+  $('addAccount').addEventListener('click', () => {
+    const name = $('accountName').value.trim() || '账号'
+    api.accountAdd(name).then((next) => {
+      $('accountName').value = ''
+      apply(next)
+      api.openSite({ account: (next.accounts[next.accounts.length - 1] || {}).id })
+    })
+  })
+  $('notifyOn').addEventListener('change', (e) => api.setSettings({ notifications: e.target.checked }))
+  $('notifyInterval').addEventListener('change', (e) => api.setSettings({ notifyIntervalSec: Number(e.target.value) }))
+  $('closeToTray').addEventListener('change', (e) => api.setSettings({ closeToTray: e.target.checked }))
+  $('dumpShapes').addEventListener('change', (e) => api.setSettings({ dumpShapes: e.target.checked }))
+  $('export').addEventListener('click', () => api.exportList().then((r) => status(r.ok ? '已导出 ' + r.path : r.error, !r.ok)))
+  $('import').addEventListener('click', () => api.importList().then((r) => {
+    if (r.ok) status('导入完成，新增 ' + r.added + ' 条')
+    else status(r.error, true)
+  }))
+  $('openSite').addEventListener('click', () => api.openSite({}))
+  api.onChanged((next) => { snap = next; apply() })
+}
+
+api.get().then((next) => {
+  snap = next
+  apply()
+  wire()
+})

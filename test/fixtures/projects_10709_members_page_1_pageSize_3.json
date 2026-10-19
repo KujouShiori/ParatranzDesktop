@@ -1,0 +1,77 @@
+[
+ {
+  "id": 38075,
+  "createdAt": "2024-06-22T13:55:24.792Z",
+  "uid": 1,
+  "project": 10709,
+  "permission": 10,
+  "translated": 281,
+  "edited": 18,
+  "reviewed": 0,
+  "user": {
+   "id": 1,
+   "username": "example-user-900002",
+   "nickname": "示例用户900002",
+   "avatar": "/media/example-avatar.png",
+   "lastVisit": "2026-01-01T00:00:00.000Z",
+   "isOnline": false
+  },
+  "totalPoints": 685.45
+ },
+ {
+  "id": 38185,
+  "createdAt": "2024-06-25T04:37:19.296Z",
+  "uid": 1560,
+  "project": 10709,
+  "permission": 1,
+  "translated": 0,
+  "edited": 0,
+  "reviewed": 0,
+  "user": {
+   "id": 1560,
+   "username": "example-user-900003",
+   "avatar": "/media/example-avatar.png",
+   "lastVisit": "2026-01-01T00:00:00.000Z",
+   "isOnline": false
+  },
+  "totalPoints": 0
+ },
+ {
+  "id": 38101,
+  "createdAt": "2024-06-23T05:52:39.817Z",
+  "uid": 5066,
+  "project": 10709,
+  "permission": 1,
+  "translated": 898,
+  "edited": 308,
+  "reviewed": 0,
+  "user": {
+   "id": 5066,
+   "username": "example-user-900004",
+   "nickname": "示例用户900004",
+   "avatar": "/media/example-avatar.png",
+   "lastVisit": "2026-01-01T00:00:00.000Z",
+   "isOnline": false
+  },
+  "totalPoints": 1713
+ },
+ {
+  "id": 38088,
+  "createdAt": "2024-06-22T18:02:54.926Z",
+  "uid": 10094,
+  "project": 10709,
+  "permission": 1,
+  "translated": 20,
+  "edited": 1,
+  "reviewed": 0,
+  "user": {
+   "id": 10094,
+   "username": "example-user-900005",
+   "nickname": "示例用户900005",
+   "avatar": "/media/example-avatar.png",
+   "lastVisit": "2026-01-01T00:00:00.000Z",
+   "isOnline": true
+  },
+  "totalPoints": 29.1
+ }
+]
