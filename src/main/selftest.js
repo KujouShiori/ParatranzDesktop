@@ -382,6 +382,34 @@ async function run() {
     return state
   })
 
+  await step('接管 WebSocket 后站点连接仍然正常', async () => {
+    const r = await probe(wc, `
+      return new Promise((resolve) => {
+        const out = { patched: false, opened: false, gotPacket: false, error: null, sample: null };
+        try {
+          out.patched = String(window.WebSocket).indexOf('WatchedWebSocket') >= 0 ||
+            !!window.WebSocket.prototype.__ptShieldWatched;
+          const s = new WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket');
+          const done = () => resolve(JSON.stringify(out));
+          setTimeout(done, 6000);
+          s.onopen = () => { out.opened = true; };
+          s.onmessage = (ev) => {
+            if (!out.gotPacket) { out.gotPacket = true; out.sample = String(ev.data).slice(0, 24); done(); }
+          };
+          s.onerror = () => { out.error = 'error'; done(); };
+          s.onclose = () => { if (!out.gotPacket) { out.error = out.error || 'closed'; done(); } };
+        } catch (e) {
+          out.error = String(e && e.message ? e.message : e);
+          resolve(JSON.stringify(out));
+        }
+      })
+    `).then((s) => JSON.parse(s))
+    if (!r.patched) throw new Error('WebSocket 没有被接管，实时提醒不会生效：' + JSON.stringify(r))
+    if (r.error) throw new Error('接管后连接失败：' + JSON.stringify(r))
+    if (!r.gotPacket) throw new Error('连上了但没收到引擎握手包，旁听可能挡住了数据：' + JSON.stringify(r))
+    return r
+  })
+
   await step('提醒轮询能跑通（未登录只能验证到公开源）', async () => {
     const notifications = require('./notifications')
     notifications.resetForTests()

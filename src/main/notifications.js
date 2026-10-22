@@ -7,6 +7,7 @@ const pure = require('../shared/pure')
 const shape = require('../shared/notify')
 const store = require('./store')
 const windows = require('./windows')
+const tray = require('./tray')
 
 // 匿名实测：/api/broadcasts 返回 []（公开），/api/mails、/api/mails/count、/api/messages 返回 401，
 // 说明这三个要登录但路径存在。字段形状只能在登录后确认，因此这里用兼容取值的适配层，
@@ -43,7 +44,31 @@ function maybeDump(feedId, account, json) {
   }
 }
 
+let unreadCount = 0
+
+// 系统通知容易被错过，所以同时在任务栏上给出痕迹：闪一下 + 角标，
+// 窗口被看到之后自动清掉。
+function markUnread(account) {
+  unreadCount += 1
+  for (const win of windows.windowsFor(account)) {
+    try {
+      win.flashFrame(true)
+      win.setOverlayIcon(tray.badgeIcon(), '有未读的新消息')
+    } catch (e) {}
+    const clear = () => {
+      unreadCount = Math.max(0, unreadCount - 1)
+      try {
+        win.flashFrame(false)
+        if (unreadCount === 0) win.setOverlayIcon(null, '')
+      } catch (e) {}
+    }
+    win.once('focus', clear)
+    win.once('show', clear)
+  }
+}
+
 function notify(account, title, body) {
+  markUnread(account)
   if (!Notification.isSupported()) {
     console.log('[提醒] ' + title + ' ' + body)
     return
@@ -112,6 +137,23 @@ async function pollAll() {
   }
 }
 
+// 页面里 socket 推来新事件时调用：稍等一小会儿（让站点的写入落到接口上），
+// 然后为该账号把所有源各拉一次，不等下一个轮询周期。
+const pending = new Set()
+
+function pollAccountNow(account) {
+  const key = String(account)
+  if (pending.has(key)) return
+  pending.add(key)
+  setTimeout(() => {
+    pending.delete(key)
+    const rules = rulesNow()
+    for (const feed of FEEDS) {
+      pollFeed(key, feed, rules).catch((e) => console.error('[提醒] 即时拉取失败', key, feed.id, String(e && e.message ? e.message : e)))
+    }
+  }, 600)
+}
+
 function schedule() {
   if (timer) clearInterval(timer)
   timer = null
@@ -141,4 +183,4 @@ function debugState() {
   return out
 }
 
-module.exports = { start, schedule, pollAll, resetForTests, debugState, FEEDS }
+module.exports = { start, schedule, pollAll, pollAccountNow, resetForTests, debugState, FEEDS }

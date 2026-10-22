@@ -470,6 +470,47 @@ module.exports = function shieldEngine(config) {
     w.fetch = patched
   }
 
+  // ---------- WebSocket 旁听 ----------
+  // 站点的私信和消息是 socket.io 推的（轮询接口被站点拒了，只有 WS）。在页面建连之前
+  // 换掉 window.WebSocket，只读不改：看到 mail / message 一类的事件帧就告诉主进程
+  // 「现在值得去拉一次」，把提醒延迟从整个轮询间隔压到一秒级。
+  const ACTIVITY_EVENTS = /"(mail|message|messages|newMessage|newMail|broadcast|notify|notification)"/
+  const ACTIVITY_PREFIX = /^(42|40)\[/
+
+  function installWebSocketWatch() {
+    const RealWS = w.WebSocket
+    if (!RealWS || RealWS.prototype.__ptShieldWatched) return
+    RealWS.prototype.__ptShieldWatched = true
+
+    function WatchedWebSocket(url, protocols) {
+      const socket = protocols === undefined ? new RealWS(url) : new RealWS(url, protocols)
+      let lastFire = 0
+      // 旁听本身出错绝不能带崩站点的连接，否则在线状态和实时推送都会被我们搞坏
+      try {
+        socket.addEventListener('message', function (ev) {
+          try {
+            const data = typeof ev.data === 'string' ? ev.data : ''
+            if (!data || !ACTIVITY_PREFIX.test(data)) return
+            if (!ACTIVITY_EVENTS.test(data)) return
+            const now = Date.now()
+            if (now - lastFire < 800) return
+            lastFire = now
+            sendIntent('activity', { source: 'socket' })
+          } catch (e) {}
+        })
+      } catch (e) {}
+      return socket
+    }
+
+    WatchedWebSocket.prototype = RealWS.prototype
+    for (const k of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']) WatchedWebSocket[k] = RealWS[k]
+    try {
+      Object.defineProperty(w, 'WebSocket', { configurable: true, writable: true, value: WatchedWebSocket })
+    } catch (e) {
+      w.WebSocket = WatchedWebSocket
+    }
+  }
+
   // ---------- DOM ----------
   function itemOf(anchor) {
     for (const sel of ITEM_CONTAINERS) {
@@ -761,6 +802,7 @@ module.exports = function shieldEngine(config) {
   installXhr()
   installFetch()
   if (MODE !== 'filter-only') {
+    installWebSocketWatch()
     injectStyle()
     installRouter()
     installObserver()

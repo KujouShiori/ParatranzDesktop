@@ -211,6 +211,12 @@ function handleIntent(event, msg) {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) return
   const payload = msg.payload || {}
+  if (msg.type === 'activity') {
+    // 页面里的 socket 帧说「有新东西」，立刻为该账号拉一次，不等轮询
+    const entry = registry.get(event.sender.id)
+    require('./notifications').pollAccountNow((entry && entry.account) || 'default')
+    return
+  }
   if (msg.type === 'block') {
     const isProject = payload.kind === 'project'
     const label = isProject ? '项目 ' + payload.id : '用户 ' + payload.id

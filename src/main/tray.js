@@ -46,6 +46,27 @@ function raise(win) {
   }
 }
 
+// 任务栏角标：一个红点，套在白边上，深色浅色任务栏都能看见
+function badgeIcon() {
+  const size = 16
+  const buf = Buffer.alloc(size * size * 4)
+  const c = (size - 1) / 2
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4
+      const d = Math.hypot(x - c, y - c)
+      if (d <= 5.4) {
+        buf[i] = 216; buf[i + 1] = 56; buf[i + 2] = 48; buf[i + 3] = 255
+      } else if (d <= 7.0) {
+        buf[i] = 245; buf[i + 1] = 245; buf[i + 2] = 245; buf[i + 3] = 255
+      } else {
+        buf[i + 3] = 0
+      }
+    }
+  }
+  return nativeImage.createFromBitmap(buf, { width: size, height: size })
+}
+
 function focusMain() {
   const list = windows.liveSiteWindows()
   const visible = list.filter((win) => win.isVisible() && !win.isMinimized())
@@ -135,4 +156,4 @@ function destroyTray() {
   }
 }
 
-module.exports = { installTray, installShortcuts, removeShortcuts, destroyTray, refreshTray: refresh, focusMain, hintHidden }
+module.exports = { installTray, installShortcuts, removeShortcuts, destroyTray, refreshTray: refresh, focusMain, hintHidden, badgeIcon }
