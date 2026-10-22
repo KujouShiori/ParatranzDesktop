@@ -150,4 +150,4 @@ function blockedUnreadConversations(items, rules, myId) {
   return Array.from(out)
 }
 
-module.exports = { actorIds, actors, blockedUnreadConversations, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }
+module.exports = { blockedUnreadConversations, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }

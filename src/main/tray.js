@@ -187,4 +187,4 @@ function destroyTray() {
   }
 }
 
-module.exports = { installTray, iconInfo, installShortcuts, removeShortcuts, destroyTray, refreshTray: refresh, focusMain, hintHidden, badgeIcon }
+module.exports = { installTray, iconInfo, installShortcuts, removeShortcuts, destroyTray, focusMain, hintHidden, badgeIcon }

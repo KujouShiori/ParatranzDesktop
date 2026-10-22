@@ -45,17 +45,6 @@ const USER_REMOVE_SCOPES = [
   /^\/users\/online(\/|$)/
 ]
 
-// 这些接口返回的是「我自己」或站点配置，改写会让页面误判登录态或丢配置
-const NEVER_FILTER = [/^\/account(\/|$)/, /^\/users\/profiles(\/|$)/, /^\/config\//]
-
-function isNeverFiltered(apiPath) {
-  return !!apiPath && NEVER_FILTER.some((re) => re.test(apiPath))
-}
-
-function hardBlockBody(projectId) {
-  return '{"message":"Project ' + Number(projectId) + ' does not exist"}'
-}
-
 const MASK_TEXT = '已屏蔽用户'
 const HIDDEN_BODY = '内容已隐藏（来自被屏蔽用户）'
 
@@ -362,13 +351,10 @@ module.exports = {
   buildRulesState,
   carriesBlockedProject,
   filterJson,
-  hardBlockBody,
-  isNeverFiltered,
   isProjectEntity,
   isUserEntity,
   isUserRemoveScope,
   maskUserEntity,
-  NEVER_FILTER,
   normalizeRules,
   parseSiteUrl,
   projectBlocked,

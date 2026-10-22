@@ -259,12 +259,10 @@ module.exports = {
   liveSiteWindows,
   windowsFor,
   broadcastRules,
-  partitionFor,
   sessionFor,
   registry,
   setRules,
   setQuitting,
   setContextMenuHandler,
-  get focusedAccount() { return focusedAccount },
   SITE
 }

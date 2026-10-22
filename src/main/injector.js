@@ -216,4 +216,4 @@ function detachForDevTools(wc) {
   if (sess) sess.mode = 'none'
 }
 
-module.exports = { install, upgradeCdp, pushRules, refreshPlugins, refreshPluginsAll, mode, describe, detachForDevTools, hasEngine, SESSIONS }
+module.exports = { install, upgradeCdp, pushRules, refreshPlugins, refreshPluginsAll, mode, describe, detachForDevTools }

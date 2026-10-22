@@ -198,14 +198,11 @@ function snapshot() {
 
 module.exports = {
   load,
-  save,
   onChange,
   addProject,
   removeProject,
   addUser,
   removeUser,
-  findProject,
-  findUser,
   userKeyOf,
   setRevealAll,
   revealProject,

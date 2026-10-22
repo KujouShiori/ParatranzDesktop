@@ -128,10 +128,7 @@ function buildCssSource(entries) {
 module.exports = {
   buildCssSource,
   buildInjectedSource,
-  compilePattern,
-  compiledMatch,
   parseHeader,
   shouldRun,
-  toSpec,
   urlMatches
 }

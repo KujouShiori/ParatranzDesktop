@@ -25,4 +25,4 @@ function loadEngine() {
   return fn
 }
 
-module.exports = { functionSource, loadEngine, SRC_PATH }
+module.exports = { functionSource, loadEngine }

@@ -94,4 +94,4 @@ function openFolder() {
   return shell.openPath(dir())
 }
 
-module.exports = { dir, injectedSource, list, openFolder, readEntries, toggle }
+module.exports = { dir, injectedSource, list, openFolder, toggle }
