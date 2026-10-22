@@ -80,6 +80,18 @@ function registerManageIpc() {
     return store.snapshot()
   })
 
+  ipcMain.handle('plugins:list', () => require('./plugins').list())
+  ipcMain.handle('plugins:toggle', (e, msg) => {
+    const res = require('./plugins').toggle(msg.file, msg.enabled)
+    require('./injector').refreshPluginsAll()
+    return res
+  })
+  ipcMain.handle('plugins:open-folder', () => require('./plugins').openFolder())
+
+  ipcMain.handle('login:token', (e, msg) => require('./login').loginWithToken((msg && msg.account) || 'default', msg && msg.token))
+  ipcMain.handle('login:whoami', (e, account) => require('./login').whoami(account || 'default'))
+  ipcMain.handle('login:open-token-page', () => require('./login').openTokenPage())
+
   ipcMain.handle('manage:export', async () => {
     const snap = store.snapshot()
     const body = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), blocklist: snap.blocklist }, null, 2)

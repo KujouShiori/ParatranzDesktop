@@ -301,6 +301,52 @@ async function run() {
     return { separateSessions: true, rulesInBothWindows: inBoth }
   })
 
+  await step('插件脚本在真实页面里执行且按 @match 过滤', async () => {
+    const plugins = require('./plugins')
+    const fs = require('fs')
+    const path = require('path')
+    const hit = path.join(plugins.dir(), 'pt-selftest-hit.user.js')
+    const miss = path.join(plugins.dir(), 'pt-selftest-miss.user.js')
+    fs.writeFileSync(hit, [
+      '// ==UserScript==',
+      '// @name        自检-应命中',
+      '// @match       https://paratranz.cn/*',
+      '// ==/UserScript==',
+      'window.__ptSelfPlugin = "ran";'
+    ].join('\n'))
+    fs.writeFileSync(miss, [
+      '// ==UserScript==',
+      '// @name        自检-不该命中',
+      '// @match       https://example.invalid/*',
+      '// ==/UserScript==',
+      'window.__ptSelfPluginMiss = "ran";'
+    ].join('\n'))
+    const second = windows.createSiteWindow({ url: 'https://paratranz.cn/projects' })
+    await waitFinishLoad(second.webContents)
+    await sleep(2500)
+    const r = await second.webContents.executeJavaScript('JSON.stringify({hit: String(window.__ptSelfPlugin || "absent"), miss: String(window.__ptSelfPluginMiss || "absent"), boot: window.__ptBootError || null})').then((s) => JSON.parse(s))
+    second.close()
+    fs.unlinkSync(hit)
+    fs.unlinkSync(miss)
+    injector.refreshPluginsAll()
+    if (r.boot) throw new Error('注入抛错：' + r.boot)
+    if (r.hit !== 'ran') throw new Error('匹配的插件没有执行：' + JSON.stringify(r))
+    if (r.miss !== 'absent') throw new Error('不匹配的插件也执行了：' + JSON.stringify(r))
+    return r
+  })
+
+  await step('隐藏到托盘后能唤回窗口', async () => {
+    const tray = require('./tray')
+    win.hide()
+    await sleep(400)
+    if (win.isVisible()) throw new Error('hide() 之后窗口仍然可见，测试前提不成立')
+    tray.focusMain()
+    await sleep(900)
+    const state = { visible: win.isVisible(), focused: win.isFocused(), minimized: win.isMinimized() }
+    if (!state.visible) throw new Error('唤回失败，窗口还藏着：' + JSON.stringify(state))
+    return state
+  })
+
   await step('提醒轮询能跑通（未登录只能验证到公开源）', async () => {
     const notifications = require('./notifications')
     notifications.resetForTests()

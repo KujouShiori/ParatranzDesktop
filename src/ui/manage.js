@@ -110,12 +110,42 @@ function renderSettings() {
   $('dumpShapes').checked = !!s.dumpShapes
 }
 
+function renderPlugins() {
+  return api.plugins().then((list) => {
+    const tbody = $('pluginTable').querySelector('tbody')
+    tbody.textContent = ''
+    $('pluginEmpty').classList.toggle('hidden', list.length > 0)
+    for (const p of list) {
+      const tr = document.createElement('tr')
+      tr.appendChild(td(p.name, 'name'))
+      tr.appendChild(td(p.kind === 'css' ? '样式' : '脚本'))
+      tr.appendChild(td((p.matches || []).join(' ') || '全部页面'))
+      tr.appendChild(td(Math.round(p.bytes / 102.4) / 10 + ' KB'))
+      const box = document.createElement('td')
+      const cb = document.createElement('input')
+      cb.type = 'checkbox'
+      cb.checked = p.enabled
+      cb.addEventListener('change', () => api.togglePlugin({ file: p.file, enabled: cb.checked }).then(refreshPluginHint))
+      box.appendChild(cb)
+      tr.appendChild(box)
+      tbody.appendChild(tr)
+    }
+    refreshPluginHint()
+  })
+}
+
+function refreshPluginHint() {
+  $('pluginHint').textContent = '插件文件夹里的改动要重载窗口才生效'
+}
+
 function apply(next) {
   if (next) snap = next
   renderProjects()
   renderUsers()
   renderAccounts()
   renderSettings()
+  renderLoginAccounts()
+  renderPlugins()
 }
 
 function td(text, cls) {
@@ -134,6 +164,25 @@ function button(label, cls, onClick) {
 }
 
 const api = window.ptManage
+
+function renderLoginAccounts() {
+  const sel = $('loginAccount')
+  if (!sel) return
+  const list = [{ id: 'default', name: '默认窗口' }].concat((snap && snap.accounts) || [])
+  const previous = sel.value
+  sel.textContent = ''
+  for (const a of list) {
+    const opt = document.createElement('option')
+    opt.value = a.id
+    opt.textContent = a.name || a.id
+    sel.appendChild(opt)
+  }
+  if (previous) sel.value = previous
+  api.whoami(sel.value).then((who) => {
+    $('loginState').textContent = who.logged ? ('已登录：' + (who.nickname || who.username)) : '未登录'
+    $('loginState').className = who.logged ? '' : 'empty'
+  })
+}
 
 function wire() {
   $('revealAll').addEventListener('change', (e) => api.setRevealAll(e.target.checked).then(apply))
@@ -173,6 +222,27 @@ function wire() {
     else status(r.error, true)
   }))
   $('openSite').addEventListener('click', () => api.openSite({}))
+  $('openPluginFolder').addEventListener('click', () => api.openPluginFolder())
+  $('refreshPlugins').addEventListener('click', () => renderPlugins())
+  $('loginAccount').addEventListener('change', renderLoginAccounts)
+  $('openTokenPage').addEventListener('click', () => api.openTokenPage())
+  $('doLogin').addEventListener('click', () => {
+    const btn = $('doLogin')
+    btn.disabled = true
+    $('loginState').textContent = '正在换取登录状态…'
+    api.loginWithToken({ account: $('loginAccount').value, token: $('loginToken').value }).then((r) => {
+      btn.disabled = false
+      if (r.ok) {
+        $('loginState').textContent = '已登录：' + r.nickname
+        $('loginState').className = ''
+        $('loginToken').value = ''
+        api.openSite({ account: $('loginAccount').value })
+      } else {
+        $('loginState').textContent = r.error
+        $('loginState').className = 'err'
+      }
+    })
+  })
   api.onChanged((next) => { snap = next; apply() })
 }
 

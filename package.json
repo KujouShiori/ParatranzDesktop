@@ -1,7 +1,7 @@
 {
   "name": "paratranz-desktop",
   "productName": "Paratranz Desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "paratranz.cn 桌面客户端：完整翻译工作台 + 项目/用户屏蔽层",
   "private": true,
   "main": "src/main/index.js",
@@ -9,8 +9,11 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "setup": "npm install && node scripts/ensure-electron.js",
+    "prestart": "node scripts/ensure-electron.js",
+    "preselftest": "node scripts/ensure-electron.js",
     "selftest": "electron . --selftest",
-    "test": "node test/run.js && node test/loader.js && node test/engine.js && node test/fetch.js && node test/notify.js && node test/parity.js",
+    "test": "node test/run.js && node test/loader.js && node test/engine.js && node test/fetch.js && node test/notify.js && node test/plugins.js && node test/parity.js",
     "dist": "electron-builder --win --x64"
   },
   "build": {
@@ -44,7 +47,8 @@
       "artifactName": "ParatranzDesktop-${version}-installer.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": true
     }
   },
   "devDependencies": {

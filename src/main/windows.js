@@ -99,6 +99,7 @@ function createSiteWindow(options) {
     if (store.snapshot().settings.closeToTray) {
       e.preventDefault()
       win.hide()
+      require('./tray').hintHidden()
     }
   })
   win.on('closed', () => {
@@ -161,8 +162,30 @@ function guardNavigation(win) {
 function siteContents() {
   const out = []
   for (const id of registry.keys()) {
+    const entry = registry.get(id)
     const wc = webContents.fromId(id)
-    if (wc && !wc.isDestroyed() && registry.get(id).kind === 'site') out.push(wc)
+    if (!entry) continue
+    if (!wc || wc.isDestroyed() || !entry.win || entry.win.isDestroyed()) {
+      registry.delete(id)
+      continue
+    }
+    if (entry.kind === 'site') out.push(wc)
+  }
+  return out
+}
+
+// 隐藏到托盘后，窗口对象还活着但不可见；这里把还活着的站点窗口都捞出来，
+// 顺带清掉已经销毁的登记，避免调用方拿到一个僵尸窗口。
+function liveSiteWindows() {
+  const out = []
+  for (const id of Array.from(registry.keys())) {
+    const entry = registry.get(id)
+    if (!entry || entry.kind !== 'site') continue
+    if (!entry.win || entry.win.isDestroyed()) {
+      registry.delete(id)
+      continue
+    }
+    out.push(entry.win)
   }
   return out
 }
@@ -227,6 +250,7 @@ module.exports = {
   registerIpc,
   createSiteWindow,
   siteContents,
+  liveSiteWindows,
   windowsFor,
   broadcastRules,
   partitionFor,

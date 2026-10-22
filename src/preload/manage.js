@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('ptManage', {
   accountRemove: (id) => call('manage:account-remove', id),
   exportList: () => call('manage:export'),
   importList: () => call('manage:import'),
+  loginWithToken: (msg) => call('login:token', msg),
+  whoami: (account) => call('login:whoami', account),
+  openTokenPage: () => call('login:open-token-page'),
+  plugins: () => call('plugins:list'),
+  togglePlugin: (msg) => call('plugins:toggle', msg),
+  openPluginFolder: () => call('plugins:open-folder'),
   onChanged: (fn) => {
     ipcRenderer.on('manage:changed', (e, snap) => fn(snap))
   }

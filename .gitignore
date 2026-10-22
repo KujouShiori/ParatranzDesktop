@@ -1,3 +1,5 @@
 node_modules/
 dist/
+dist2/
+node_modules/electron/dist.bak/
 *.log

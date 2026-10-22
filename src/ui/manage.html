@@ -43,6 +43,18 @@
   </section>
 
   <section>
+    <h2>登录</h2>
+    <p class="hint">不用在客户端里输密码：在系统浏览器打开个人中心，复制那枚 32 位 Token 贴进来，客户端自己在对应账号的会话里换回登录状态。</p>
+    <div class="add-row">
+      <select id="loginAccount"></select>
+      <input type="text" id="loginToken" placeholder="32 位 Token" size="34">
+      <button id="openTokenPage">在浏览器打开个人中心</button>
+      <button id="doLogin">登录</button>
+      <span id="loginState" class="empty">未登录</span>
+    </div>
+  </section>
+
+  <section>
     <h2>账号窗口</h2>
     <div class="add-row">
       <input type="text" id="accountName" placeholder="新账号备注名">
@@ -50,6 +62,21 @@
     </div>
     <ul id="accountList"></ul>
     <p class="hint">每个账号有独立的登录状态窗口，互不干扰；屏蔽名单是全局共用的。</p>
+  </section>
+
+  <section>
+    <h2>插件</h2>
+    <p class="hint">把 .user.js / .js / .css 丢进插件文件夹就会自动生效，支持 Tampermonkey 的 ==UserScript== 头部里的 @match 与 @include。脚本在屏蔽引擎之后运行，绕不过屏蔽。改完要重载窗口才生效（不会替你刷新，免得打断正在编辑的译文）。</p>
+    <div class="add-row">
+      <button id="openPluginFolder">打开插件文件夹</button>
+      <button id="refreshPlugins" class="ghost">重新扫描</button>
+      <span id="pluginHint" class="empty"></span>
+    </div>
+    <table id="pluginTable">
+      <thead><tr><th>插件</th><th>类型</th><th>匹配</th><th>大小</th><th>启用</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="empty" id="pluginEmpty">插件文件夹里还没有文件。</p>
   </section>
 
   <section>

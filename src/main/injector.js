@@ -18,10 +18,17 @@ function randomToken() {
 
 function bootstrapCode(sess) {
   const config = { token: sess.token, handleName: sess.handle, mode: 'full', rules: sess.state }
+  const engineCall = '(' + loader.functionSource() + ')(' + JSON.stringify(config) + ');'
+  // 插件排在屏蔽引擎之后：先接管 fetch / XMLHttpRequest，脚本才有机会去改写上层的显示，
+  // 而不是绕过屏蔽去自己发请求。
+  let plugins = ''
+  try {
+    plugins = require('./plugins').injectedSource()
+  } catch (e) {
+    console.log('[注入] 插件源码构建失败，本次只加载屏蔽引擎：', String(e && e.message ? e.message : e))
+  }
   // 包一层 try/catch：executeJavaScript 只会报「脚本执行失败」，真实异常得自己捞回主进程
-  return 'window.__ptBootError=null;try{' +
-    '(' + loader.functionSource() + ')(' + JSON.stringify(config) + ');' +
-    '}catch(e){window.__ptBootError=String((e&&e.stack)||e)}'
+  return 'window.__ptBootError=null;try{' + engineCall + (plugins ? '\n' + plugins : '') + '}catch(e){window.__ptBootError=String((e&&e.stack)||e)}'
 }
 
 async function readBootError(wc) {
@@ -71,11 +78,12 @@ function watchDomReady(wc, sess) {
 
 async function cdpInject(wc, sess) {
   await withTimeout(wc.debugger.sendCommand('Page.enable'), 2000, 'Page.enable')
-  await withTimeout(
+  const res = await withTimeout(
     wc.debugger.sendCommand('Page.addScriptToEvaluateOnNewDocument', { source: bootstrapCode(sess) }),
     2000,
     'addScriptToEvaluateOnNewDocument'
   )
+  sess.scriptId = res && res.identifier
   sess.mode = 'cdp'
   return 'cdp'
 }
@@ -120,6 +128,24 @@ function install(wc, state) {
     sess.mode = 'fallback'
     return 'fallback'
   })
+}
+
+// 插件增删或开关之后，重新注册 document-start 脚本；已经在看的页面要重载才生效，
+// 这里不替用户刷新，免得把他正在编辑的译文草稿打断。
+function refreshPlugins(wc) {
+  const sess = SESSIONS.get(wc)
+  if (!sess || wc.isDestroyed()) return
+  if (sess.mode === 'cdp' && sess.scriptId) {
+    wc.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: sess.scriptId })
+      .then(() => cdpInject(wc, sess))
+      .catch((e) => console.log('[注入] 插件刷新失败', String(e && e.message ? e.message : e)))
+  }
+}
+
+function refreshPluginsAll() {
+  for (const wc of require('electron').webContents.getAllWebContents()) {
+    if (!wc.isDestroyed() && SESSIONS.get(wc)) refreshPlugins(wc)
+  }
 }
 
 function pushRules(wc, state) {
@@ -190,4 +216,4 @@ function detachForDevTools(wc) {
   if (sess) sess.mode = 'none'
 }
 
-module.exports = { install, upgradeCdp, pushRules, mode, describe, detachForDevTools, hasEngine, SESSIONS }
+module.exports = { install, upgradeCdp, pushRules, refreshPlugins, refreshPluginsAll, mode, describe, detachForDevTools, hasEngine, SESSIONS }
