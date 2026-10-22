@@ -70,5 +70,20 @@ check('内联 project 对象识别', shape.projectIdsOf({ project: { id: 12, nam
   check('临时解除后不再拦提醒', shape.itemsOf(notifFixture).filter((it) => shape.shouldSkip(it, r)).length, 0)
 }
 
+// 去重键：会话 id 不变但来了新消息时，必须算作新的一条
+{
+  const conv = { id: 55, user: { id: 7, username: 'a' }, updatedAt: '2026-10-22T01:00:00Z', lastContent: '第一句' }
+  const same = { id: 55, user: { id: 7, username: 'a' }, updatedAt: '2026-10-22T01:00:00Z', lastContent: '第一句' }
+  const newer = { id: 55, user: { id: 7, username: 'a' }, updatedAt: '2026-10-22T02:00:00Z', lastContent: '第二句' }
+  check('同一会话内容没变算重复', shape.keyOf(conv, 0) === shape.keyOf(same, 0), true)
+  check('同一会话来了新消息算新条目', shape.keyOf(conv, 0) === shape.keyOf(newer, 0), false)
+  check('只有 id 的条目按 id 去重', shape.keyOf({ id: 9 }, 3), '9')
+  check('没有 id 时用下标兜底', shape.keyOf({ content: 'x' }, 3).startsWith('idx-3'), true)
+  const longA = { id: 1, content: '啊'.repeat(300) }
+  const longB = { id: 1, content: '啊'.repeat(301) }
+  check('超长正文靠长度区分', shape.keyOf(longA, 0) === shape.keyOf(longB, 0), false)
+  check('同一条超长正文稳定', shape.keyOf(longA, 0) === shape.keyOf({ id: 1, content: '啊'.repeat(300) }, 0), true)
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

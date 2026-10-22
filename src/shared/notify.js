@@ -19,6 +19,33 @@ function idOf(item, index) {
   return 'idx-' + index
 }
 
+function firstString(item, keys) {
+  for (const k of keys) {
+    const v = item && item[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (typeof v === 'number') return String(v)
+  }
+  return ''
+}
+
+function hash(text) {
+  let h = 5381
+  for (let i = 0; i < text.length; i++) h = ((h * 33) ^ text.charCodeAt(i)) >>> 0
+  return h.toString(36)
+}
+
+// 只用 id 去重会漏：私信列表返回的可能是「会话」，同一个人再发一条时 id 不变。
+// 所以把时间戳和正文摘要一起算进键里，正文没变才算重复。
+function keyOf(item, index) {
+  if (!item || typeof item !== 'object') return 'idx-' + index
+  const id = idOf(item, index)
+  const stamp = firstString(item, ['updatedAt', 'lastAt', 'lastTime', 'sentAt', 'createdAt', 'time', 'date'])
+  const body = firstString(item, ['lastContent', 'lastMessage', 'content', 'body', 'text', 'message', 'subject', 'title'])
+  const digest = body ? body.length + ':' + hash(body.slice(0, 120)) : ''
+  if (!stamp && !digest) return id
+  return id + '|' + stamp + '|' + digest
+}
+
 function actors(item) {
   const out = []
   for (const key of ['user', 'from', 'author', 'creator', 'sender']) {
@@ -70,4 +97,4 @@ function bodyOf(item) {
   return ''
 }
 
-module.exports = { actors, bodyOf, idOf, itemsOf, projectIdsOf, shouldSkip, titleOf }
+module.exports = { actors, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }

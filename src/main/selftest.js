@@ -49,6 +49,41 @@ function recordRequests(ses) {
   }
 }
 
+// 登录后才有真实样本：这里只把「字段名 + 值类型」记进报告，私信正文一律不落盘。
+function shapeOf(value, depth) {
+  if (Array.isArray(value)) return value.length ? { array: [shapeOf(value[0], depth + 1)] } : { array: [] }
+  if (value === null) return 'null'
+  if (typeof value !== 'object') return typeof value
+  if (depth > 2) return 'object'
+  const out = {}
+  for (const k of Object.keys(value)) out[k] = shapeOf(value[k], depth + 1)
+  return out
+}
+
+async function probeRealFeeds(ses) {
+  const out = {}
+  const me = await ses.fetch('https://paratranz.cn/api/account', { headers: { accept: 'application/json' } })
+  const meText = (await me.text()).trim()
+  if (!meText) {
+    out.loggedIn = false
+    return out
+  }
+  const account = JSON.parse(meText)
+  out.loggedIn = true
+  out.username = account.username
+  for (const feed of require('./notifications').FEEDS) {
+    try {
+      const res = await ses.fetch('https://paratranz.cn' + feed.list, { headers: { accept: 'application/json' } })
+      const json = res.ok ? await res.json() : null
+      const items = require('../shared/notify').itemsOf(json)
+      out[feed.id] = { status: res.status, count: items.length, first: items.length ? shapeOf(items[0], 0) : null }
+    } catch (e) {
+      out[feed.id] = { error: String(e && e.message ? e.message : e) }
+    }
+  }
+  return out
+}
+
 async function run() {
   const report = { startedAt: new Date().toISOString(), electron: process.versions.electron, chrome: process.versions.chrome, steps: [] }
   fs.mkdirSync(OUT(), { recursive: true })
@@ -360,6 +395,23 @@ async function run() {
       throw new Error('公开公告源拉到了却没被记账：' + JSON.stringify(primed))
     }
     return { primed: primed, requestsSeen: net.matching('/api/').length }
+  })
+
+  await step('真实私信接口字段与提醒判定', async () => {
+    const probe = await probeRealFeeds(ses)
+    if (!probe.loggedIn) {
+      console.log('  (未登录，跳过：登录后再跑这一步可以拿到真实字段)')
+      return { skipped: '未登录' }
+    }
+    const mails = probe.mails || {}
+    if (mails.status === 401) throw new Error('账号已登录但私信接口仍 401')
+    report.realShapes = probe
+    return {
+      account: probe.username,
+      mails: { status: mails.status, count: mails.count, keys: mails.first && Object.keys(mails.first) },
+      messages: probe.messages && { status: probe.messages.status, count: probe.messages.count, keys: probe.messages.first && Object.keys(probe.messages.first) },
+      broadcasts: probe.broadcasts && { status: probe.broadcasts.status, count: probe.broadcasts.count }
+    }
   })
 
   await step('退出前名单不含自检残留', () => {

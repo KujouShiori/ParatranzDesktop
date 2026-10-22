@@ -83,13 +83,13 @@ async function pollFeed(account, feed, rules) {
   maybeDump(feed.id, account, json)
   const items = shape.itemsOf(json)
   if (!entry.primed) {
-    for (let i = 0; i < items.length; i++) entry.seen.add(shape.idOf(items[i], i))
+    for (let i = 0; i < items.length; i++) entry.seen.add(shape.keyOf(items[i], i))
     entry.primed = true
     return
   }
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
-    const id = shape.idOf(item, i)
+    const id = shape.keyOf(item, i)
     if (entry.seen.has(id)) continue
     entry.seen.add(id)
     if (shape.shouldSkip(item, rules)) continue
