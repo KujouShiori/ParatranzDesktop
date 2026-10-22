@@ -15,6 +15,10 @@ const CASES = [
   { file: 'users_leaderboard_page_1_pageSize_2.json', url: '/api/users/leaderboard', block: (j) => ({ users: [{ id: j[0].id }, { username: j[1].username }] }) },
   { file: 'users_leaderboard_page_1_pageSize_2.json', url: '/api/users/leaderboard', block: () => ({ users: [{ username: 'nosuch' }] }) },
   { file: 'projects_10709_terms_page_1_pageSize_2.json', url: '/api/projects/10709/terms', block: () => ({ users: [{ id: 1 }] }) },
+  { file: 'files_list.json', url: '/api/projects/18245/files', block: () => ({ projects: [{ id: 18245 }] }) },
+  { file: 'files_list.json', url: '/api/projects/5000/files', block: () => ({ projects: [{ id: 777 }] }) },
+  { file: 'term_values.json', url: '/api/projects/18245/terms', block: () => ({ projects: [{ id: 18245 }] }) },
+  { file: 'term_values.json', url: '/api/projects/5000/terms', block: () => ({ users: [{ id: 4242 }] }) },
   {
     file: 'synthetic_terms_with_authors.json',
     url: '/api/projects/10709/terms?page=1',

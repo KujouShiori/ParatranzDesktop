@@ -1,12 +1,18 @@
 'use strict'
 
-const PROJECT_HINT_KEYS = [
-  'source', 'dest', 'stats', 'license', 'isPrivate', 'desc',
-  'translatableOnly', 'words', 'translated', 'reviewed', 'createDate', 'creatorId',
-  'logo', 'game', 'privacy', 'stage', 'activeLevel'
+// 项目行的核心特征键。要求至少命中两个：文件行、词条行都只有零个，
+// 而项目行动辄七八个，这样文件 id 撞上被屏蔽项目 id 时不会被误删。
+const PROJECT_CORE_KEYS = [
+  'source', 'dest', 'license', 'stats', 'privacy', 'isPrivate',
+  'logo', 'game', 'activeLevel', 'translatableOnly'
 ]
 
-const TERM_LIKE_KEYS = ['key', 'zh', 'ja', 'en', 'values', 'note', 'proof']
+// 出现任意一个就不是项目：这些是文件行 / 词条行 / 翻译记忆行独有的字段
+const NON_PROJECT_KEYS = [
+  'format', 'hash', 'folder', 'progress', 'key', 'term', 'translation',
+  'original', 'values', 'variants', 'caseSensitive', 'match', 'note', 'pid'
+]
+
 
 // 站点用 uid / project 作为外键名，不是 userId / projectId
 const USER_ID_FIELD = /^(user_?id|uid)$/i
@@ -112,11 +118,10 @@ function userNameBlocked(rules, name) {
 function isProjectEntity(o) {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return false
   if (!Number.isFinite(Number(o.id)) || typeof o.name !== 'string') return false
-  let hints = 0
-  for (const k of PROJECT_HINT_KEYS) if (k in o) hints++
-  if (hints === 0) return false
-  for (const k of TERM_LIKE_KEYS) if (k in o) return false
-  return true
+  for (const k of NON_PROJECT_KEYS) if (k in o) return false
+  let core = 0
+  for (const k of PROJECT_CORE_KEYS) if (k in o) core++
+  return core >= 2
 }
 
 function isUserEntity(o) {
@@ -130,6 +135,8 @@ function carriesBlockedProject(o, rules) {
     if (!PROJECT_ID_FIELD.test(k)) continue
     const v = o[k]
     if ((typeof v === 'number' || typeof v === 'string') && projectBlocked(rules, v)) return v
+    // 真实返回里项目引用常常是对象：{ id, name }
+    if (v && typeof v === 'object' && Number.isFinite(Number(v.id)) && projectBlocked(rules, v.id)) return v.id
   }
   return 0
 }
@@ -186,7 +193,9 @@ function maskUserEntity(u) {
   if (typeof u.username === 'string') u.username = MASK_TEXT
   if ('nickname' in u) u.nickname = MASK_TEXT
   if (typeof u.avatar === 'string') u.avatar = ''
-  if (typeof u.aboutMe === 'string') u.aboutMe = ''
+  if ('bio' in u && typeof u.bio === 'string') u.bio = ''
+  if ('aboutMe' in u && typeof u.aboutMe === 'string') u.aboutMe = ''
+  if ('email' in u && typeof u.email === 'string') u.email = ''
   return u
 }
 
@@ -302,8 +311,8 @@ function buildRulesState(rules) {
 module.exports = {
   AUTHOR_KEYS,
   MASK_TEXT,
-  PROJECT_HINT_KEYS,
-  TERM_LIKE_KEYS,
+  PROJECT_CORE_KEYS,
+  NON_PROJECT_KEYS,
   USER_REMOVE_SCOPES,
   buildRulesState,
   carriesBlockedProject,

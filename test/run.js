@@ -133,5 +133,44 @@ check('foreign url ignored', P.parseSiteUrl('https://evil.test/projects/10709'),
 check('foreign url cannot hard block', P.urlTargetsBlockedProject(rules({ projects: [{ id: 10709 }] }), 'https://evil.test/projects/10709'), 0)
 check('static subdomain is not site routing', P.parseSiteUrl('https://static.paratranz.cn/media/x.png').foreign, false)
 
+// 11. 真实形状回归：文件行不是项目，文件 id 与被屏蔽项目 id 撞车时不能误删
+{
+  const files = fixture('files_list.json')
+  check('文件行不被当成项目实体', P.isProjectEntity(files[0]), false)
+  const blockedOwnId = JSON.parse(JSON.stringify(files))
+  P.filterJson(blockedOwnId, rules({ projects: [{ id: 777 }] }), P.parseSiteUrl('/api/projects/5000/files'))
+  check('按 project 外键剔除文件行', blockedOwnId.map((f) => f.id), [18245, 777])
+  check('id 撞车的文件行存活（它的 project 是 5000）', blockedOwnId.some((f) => f.id === 777 && f.project === 5000), true)
+  const blockedProject = JSON.parse(JSON.stringify(files))
+  P.filterJson(blockedProject, rules({ projects: [{ id: 18245 }] }), P.parseSiteUrl('/api/projects/18245/files'))
+  check('被屏蔽项目的文件整行消失', blockedProject.map((f) => f.id), [99, 777])
+}
+
+// 12. 真实形状回归：项目引用是对象 { id, name }
+{
+  const terms = fixture('term_values.json')
+  const data = JSON.parse(JSON.stringify(terms))
+  P.filterJson(data, rules({ projects: [{ id: 18245 }] }), P.parseSiteUrl('/api/projects/18245/terms?page=1'))
+  check('对象形式的 project 也能命中', data.results.map((t) => t.id), [4002])
+  check('对象命中后 rowCount 同步', data.rowCount, 1)
+}
+
+// 13. 真实形状回归：被屏蔽用户的 bio 与 email 也要脱敏，译文正文一条不能少
+{
+  const terms = fixture('term_values.json')
+  const data = JSON.parse(JSON.stringify(terms))
+  const stats = P.filterJson(data, rules({ users: [{ id: 4242 }] }), P.parseSiteUrl('/api/projects/5000/terms?page=1'))
+  check('词条条数不变', data.results.length, 2)
+  check('译文正文不变', data.results.map((t) => t.translation), ['你好', '再见'])
+  const victim = data.results[0].user
+  const other = data.results[1].user
+  check('用户名脱敏', victim.username, P.MASK_TEXT)
+  check('昵称脱敏', victim.nickname, P.MASK_TEXT)
+  check('bio 被清空', victim.bio, '')
+  check('email 被清空', victim.email, '')
+  check('未被屏蔽者不受影响', [other.username, other.email], ['goodguy', 'other@example.invalid'])
+  check('只记脱敏不记删除', [stats.maskedUsers, stats.droppedUsers], [1, 0])
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

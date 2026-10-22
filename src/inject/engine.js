@@ -9,12 +9,14 @@ module.exports = function shieldEngine(config) {
   const MODE = config.mode || 'full'
 
   const MASK_TEXT = '已屏蔽用户'
-  const PROJECT_HINT_KEYS = [
-    'source', 'dest', 'stats', 'license', 'isPrivate', 'desc',
-    'translatableOnly', 'words', 'translated', 'reviewed', 'createDate', 'creatorId',
-    'logo', 'game', 'privacy', 'stage', 'activeLevel'
+  const PROJECT_CORE_KEYS = [
+    'source', 'dest', 'license', 'stats', 'privacy', 'isPrivate',
+    'logo', 'game', 'activeLevel', 'translatableOnly'
   ]
-  const TERM_LIKE_KEYS = ['key', 'zh', 'ja', 'en', 'values', 'note', 'proof']
+  const NON_PROJECT_KEYS = [
+    'format', 'hash', 'folder', 'progress', 'key', 'term', 'translation',
+    'original', 'values', 'variants', 'caseSensitive', 'match', 'note', 'pid'
+  ]
   const USER_ID_FIELD = /^(user_?id|uid)$/i
   const PROJECT_ID_FIELD = /^(project_?id|project)$/i
   const AUTHOR_KEYS = ['user', 'from', 'author', 'creator', 'targetUser', 'reviewer', 'leader', 'owner']
@@ -93,11 +95,10 @@ module.exports = function shieldEngine(config) {
   function isProjectEntity(o) {
     if (!o || typeof o !== 'object' || Array.isArray(o)) return false
     if (!Number.isFinite(Number(o.id)) || typeof o.name !== 'string') return false
-    let hints = 0
-    for (const k of PROJECT_HINT_KEYS) if (k in o) hints++
-    if (hints === 0) return false
-    for (const k of TERM_LIKE_KEYS) if (k in o) return false
-    return true
+    for (const k of NON_PROJECT_KEYS) if (k in o) return false
+    let core = 0
+    for (const k of PROJECT_CORE_KEYS) if (k in o) core++
+    return core >= 2
   }
 
   function isUserEntity(o) {
@@ -111,6 +112,7 @@ module.exports = function shieldEngine(config) {
       if (!PROJECT_ID_FIELD.test(k)) continue
       const v = o[k]
       if ((typeof v === 'number' || typeof v === 'string') && projectBlocked(v)) return true
+      if (v && typeof v === 'object' && Number.isFinite(Number(v.id)) && projectBlocked(v.id)) return true
     }
     return false
   }
@@ -156,7 +158,9 @@ module.exports = function shieldEngine(config) {
     if (typeof u.username === 'string') u.username = MASK_TEXT
     if ('nickname' in u) u.nickname = MASK_TEXT
     if (typeof u.avatar === 'string') u.avatar = ''
-    if (typeof u.aboutMe === 'string') u.aboutMe = ''
+    if ('bio' in u && typeof u.bio === 'string') u.bio = ''
+    if ('aboutMe' in u && typeof u.aboutMe === 'string') u.aboutMe = ''
+    if ('email' in u && typeof u.email === 'string') u.email = ''
     return u
   }
 

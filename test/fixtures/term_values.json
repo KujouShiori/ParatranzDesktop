@@ -1,0 +1,56 @@
+{
+  "results": [
+    {
+      "id": 4001,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-03T00:00:00.000Z",
+      "updatedBy": 4242,
+      "pos": null,
+      "uid": 4242,
+      "term": "こんにちは",
+      "translation": "你好",
+      "note": "示例备注",
+      "project": { "id": 18245, "name": "示例项目甲" },
+      "variants": [],
+      "caseSensitive": false,
+      "user": {
+        "id": 4242,
+        "username": "example-translator",
+        "nickname": "示例译员",
+        "avatar": "/media/example-avatar.png",
+        "bio": "这段个人简介不该被被屏蔽者看到",
+        "email": "someone@example.invalid",
+        "lastVisit": "2026-01-03T00:00:00.000Z"
+      },
+      "match": ["こんにちは"]
+    },
+    {
+      "id": 4002,
+      "createdAt": "2026-01-01T00:00:00.000Z",
+      "updatedAt": "2026-01-04T00:00:00.000Z",
+      "updatedBy": 4343,
+      "pos": null,
+      "uid": 4343,
+      "term": "さようなら",
+      "translation": "再见",
+      "note": "",
+      "project": { "id": 5000, "name": "示例项目乙" },
+      "variants": [],
+      "caseSensitive": false,
+      "user": {
+        "id": 4343,
+        "username": "goodguy",
+        "nickname": "好人",
+        "avatar": "/media/other-avatar.png",
+        "bio": "",
+        "email": "other@example.invalid",
+        "lastVisit": "2026-01-04T00:00:00.000Z"
+      },
+      "match": ["さようなら"]
+    }
+  ],
+  "page": 1,
+  "pageSize": 2,
+  "rowCount": 2,
+  "pageCount": 1
+}
