@@ -133,4 +133,21 @@ function bodyOf(item) {
   return ''
 }
 
-module.exports = { actorIds, actors, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }
+// 开关打开时：哪些会话该被标记已读。只处理「我收到的」且「发信人被屏蔽」的行，
+// 返回要去 clear 的对方 uid（站点自己也是用这个 uid 调 /mails/conversations/{uid}）。
+function blockedUnreadConversations(items, rules, myId) {
+  const mine = Number(myId)
+  const out = new Set()
+  for (const item of items || []) {
+    if (!item || typeof item !== 'object') continue
+    if (Number.isFinite(mine) && Number(item.to) !== mine) continue
+    if (item.status === 1) continue
+    const sender = (item.fromUser && item.fromUser.id) || (item.user && item.user.id) || item.from || item.uid
+    if (!Number.isFinite(Number(sender))) continue
+    if (!pure.userEntityBlocked(rules, { id: Number(sender), username: item && item.fromUser && item.fromUser.username })) continue
+    out.add(Number(sender))
+  }
+  return Array.from(out)
+}
+
+module.exports = { actorIds, actors, blockedUnreadConversations, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }

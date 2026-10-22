@@ -91,6 +91,8 @@
       </select>
     </label>
     <label><input type="checkbox" id="closeToTray"> 关闭主窗口时留在托盘</label>
+    <label><input type="checkbox" id="autoClearMail"> 被屏蔽者的私信完全隐藏，并自动标为已读</label>
+    <p class="hint">默认关闭。开启后私信列表里被屏蔽者的行会整条消失，客户端同时调用站点自己的接口把与该人的会话标记已读（效果等同于你在网页上点开那条会话）——这会改动服务器上的已读状态，且不可撤销。关闭时保留该行、只显示「已屏蔽用户」与「内容已隐藏」，未读由站点自身机制清除。</p>
     <label><input type="checkbox" id="dumpShapes"> 记录接口原始结构（调试用，写入设置目录 shape-dump）</label>
   </section>
 

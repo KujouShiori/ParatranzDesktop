@@ -107,6 +107,7 @@ function renderSettings() {
   $('notifyOn').checked = s.notifications !== false
   $('notifyInterval').value = String(s.notifyIntervalSec || 45)
   $('closeToTray').checked = s.closeToTray !== false
+  $('autoClearMail').checked = s.autoClearBlockedMail === true
   $('dumpShapes').checked = !!s.dumpShapes
 }
 
@@ -215,6 +216,13 @@ function wire() {
   $('notifyOn').addEventListener('change', (e) => api.setSettings({ notifications: e.target.checked }))
   $('notifyInterval').addEventListener('change', (e) => api.setSettings({ notifyIntervalSec: Number(e.target.value) }))
   $('closeToTray').addEventListener('change', (e) => api.setSettings({ closeToTray: e.target.checked }))
+  $('autoClearMail').addEventListener('change', (e) => {
+    if (e.target.checked && !confirm('开启后，客户端会调用站点接口把被屏蔽者的会话标记为已读。这会改动服务器上的已读状态，且不可撤销。确认开启？')) {
+      e.target.checked = false
+      return
+    }
+    api.setSettings({ autoClearBlockedMail: e.target.checked })
+  })
   $('dumpShapes').addEventListener('change', (e) => api.setSettings({ dumpShapes: e.target.checked }))
   $('export').addEventListener('click', () => api.exportList().then((r) => status(r.ok ? '已导出 ' + r.path : r.error, !r.ok)))
   $('import').addEventListener('click', () => api.importList().then((r) => {

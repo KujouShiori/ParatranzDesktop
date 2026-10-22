@@ -73,7 +73,8 @@ module.exports = function shieldEngine(config) {
       userNames: new Set((state && state.userNames) || []),
       revealProjects: new Set((state && state.revealProjectIds) || []),
       revealUsers: new Set((state && state.revealUserKeys) || []),
-      revealAll: !!(state && state.revealAll)
+      revealAll: !!(state && state.revealAll),
+      clearBlockedMail: !!(state && state.clearBlockedMail)
     }
     r.empty = !r.projectIds.size && !r.userIds.size && !r.userNames.size
     return r
@@ -182,6 +183,8 @@ module.exports = function shieldEngine(config) {
 
   function isUserRemoveScope(apiPath) {
     if (!apiPath) return false
+    // 开了「完全隐藏并自动标已读」之后，私信列表回到整行移除的处理
+    if (rules.clearBlockedMail && /^\/mails(\/|$)/.test(apiPath)) return true
     return USER_REMOVE_SCOPES.some((re) => re.test(apiPath))
   }
 

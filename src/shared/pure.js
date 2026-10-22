@@ -94,6 +94,7 @@ function normalizeRules(raw) {
   for (const id of reveal.projectIds || []) rules.revealProjects.add(Number(id))
   for (const key of reveal.userKeys || []) rules.revealUsers.add(String(key))
   rules.revealAll = !!reveal.all
+  rules.clearBlockedMail = !!(raw && raw.clearBlockedMail)
   return rules
 }
 
@@ -220,8 +221,11 @@ function urlTargetsBlockedProject(rules, href) {
   return 0
 }
 
-function isUserRemoveScope(apiPath) {
+// 开了「完全隐藏并自动标已读」之后，私信列表回到整行移除的处理；
+// 没开时保留行，让站点自己的 2 秒自动标已读能工作，未读角标才不会卡住
+function isUserRemoveScope(apiPath, rules) {
   if (!apiPath) return false
+  if (rules && rules.clearBlockedMail && /^\/mails(\/|$)/.test(apiPath)) return true
   return USER_REMOVE_SCOPES.some((re) => re.test(apiPath))
 }
 
@@ -245,7 +249,7 @@ function envelopeArrayKey(node) {
 
 function filterJson(data, rules, urlInfo, stats) {
   const s = stats || { droppedProjects: 0, droppedUsers: 0, maskedUsers: 0 }
-  const removeUsers = isUserRemoveScope(urlInfo && urlInfo.apiPath)
+  const removeUsers = isUserRemoveScope(urlInfo && urlInfo.apiPath, rules)
   const listKey = envelopeArrayKey(data)
   const before = listKey ? data[listKey].length : 0
   walk(data, 0)
@@ -340,6 +344,7 @@ function buildRulesState(rules) {
     userIds: Array.from(rules.userIds),
     userNames: Array.from(rules.userNames),
     revealAll: rules.revealAll,
+    clearBlockedMail: !!rules.clearBlockedMail,
     revealProjectIds: Array.from(rules.revealProjects),
     revealUserKeys: Array.from(rules.revealUsers)
   }

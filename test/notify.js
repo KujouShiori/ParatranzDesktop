@@ -118,5 +118,26 @@ check('内联 project 对象识别', shape.projectIdsOf({ project: { id: 12, nam
   check('时间戳不会被当成用户 id', shape.shouldSkip({ id: 1, from: 1697000000000, to: 1697000001000 }, rules({ users: [{ id: 1697000000000 }] })), false)
 }
 
+// 自动标已读的筛选：只挑「我收到的 + 未读 + 发信人被屏蔽」
+{
+  const mails = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'mails_list.json'), 'utf8'))
+  const items = shape.itemsOf(mails)
+  const blockedSender = rules({ users: [{ id: 900001 }] })
+  check('只挑出被屏蔽者的会话', shape.blockedUnreadConversations(items, blockedSender, 1), [900001])
+  check('没屏蔽任何人时不标任何会话', shape.blockedUnreadConversations(items, rules({}), 1), [])
+
+  const read = [{ id: 1, from: 900001, to: 1, status: 1, uid: 900001, fromUser: { id: 900001, username: 'example-sender' } }]
+  check('已读过的不再重复标', shape.blockedUnreadConversations(read, blockedSender, 1), [])
+
+  const sentByMe = [{ id: 2, from: 1, to: 900001, status: 0, uid: 1, fromUser: { id: 1, username: 'example-me' } }]
+  check('我发出去的不标（那是对方的已读状态）', shape.blockedUnreadConversations(sentByMe, rules({ users: [{ id: 900001 }] }), 1), [])
+
+  const sameConv = [
+    { id: 3, from: 900001, to: 1, status: 0, uid: 900001, fromUser: { id: 900001, username: 'example-sender' } },
+    { id: 4, from: 900001, to: 1, status: 0, uid: 900001, fromUser: { id: 900001, username: 'example-sender' } }
+  ]
+  check('同一会话的多条只标一次', shape.blockedUnreadConversations(sameConv, blockedSender, 1), [900001])
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

@@ -19,6 +19,7 @@ const FEEDS = [
 ]
 
 const state = new Map()
+const cleared = new Map()
 let timer = null
 let running = false
 let dumpShapes = false
@@ -28,7 +29,8 @@ function rulesNow() {
   return pure.normalizeRules({
     projects: snap.blocklist.projects,
     users: snap.blocklist.users,
-    reveal: snap.reveal
+    reveal: snap.reveal,
+    clearBlockedMail: snap.settings.autoClearBlockedMail === true
   })
 }
 
@@ -86,6 +88,47 @@ function notify(account, title, body) {
   n.show()
 }
 
+const myIds = new Map()
+
+async function myUidFor(account, ses) {
+  if (myIds.has(account)) return myIds.get(account)
+  try {
+    const res = await ses.fetch('https://paratranz.cn/api/account', { headers: { accept: 'application/json' } })
+    const text = (await res.text()).trim()
+    if (!text) return null
+    const uid = Number(JSON.parse(text).id)
+    if (Number.isFinite(uid)) myIds.set(account, uid)
+    return Number.isFinite(uid) ? uid : null
+  } catch (e) {
+    return null
+  }
+}
+
+// 开关打开时才会走到这里：这是唯一会改动服务器状态的动作（把与该人的会话标记已读），
+// 用的是站点自己的接口，效果等同于你在网页上点开那条会话。
+async function clearBlockedConversations(account, ses, items, rules) {
+  const myId = await myUidFor(account, ses)
+  const uids = shape.blockedUnreadConversations(items, rules, myId)
+  const done = cleared.get(account) || new Set()
+  cleared.set(account, done)
+  const results = []
+  for (const uid of uids) {
+    if (done.has(uid)) continue
+    done.add(uid)
+    try {
+      const res = await ses.fetch('https://paratranz.cn/api/mails/conversations/' + uid, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ op: 'read' })
+      })
+      results.push({ uid: uid, status: res.status })
+    } catch (e) {
+      results.push({ uid: uid, error: String(e && e.message ? e.message : e) })
+    }
+  }
+  return results
+}
+
 async function pollFeed(account, feed, rules) {
   const key = account + '/' + feed.id
   let entry = state.get(key)
@@ -107,6 +150,9 @@ async function pollFeed(account, feed, rules) {
   }
   maybeDump(feed.id, account, json)
   const items = shape.itemsOf(json)
+  if (feed.id === 'mails' && rules.clearBlockedMail) {
+    clearBlockedConversations(account, ses, items, rules).catch((e) => console.error('[提醒] 标记已读失败', account, String(e && e.message ? e.message : e)))
+  }
   if (!entry.primed) {
     for (let i = 0; i < items.length; i++) entry.seen.add(shape.keyOf(items[i], i))
     entry.primed = true
@@ -215,6 +261,8 @@ function start() {
 
 function resetForTests() {
   state.clear()
+  cleared.clear()
+  myIds.clear()
 }
 
 function debugState() {

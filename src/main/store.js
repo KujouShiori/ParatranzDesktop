@@ -12,7 +12,8 @@ const DEFAULT_DOC = {
     notifications: true,
     notifyIntervalSec: 45,
     closeToTray: true,
-    revealScope: 'global'
+    revealScope: 'global',
+    autoClearBlockedMail: false
   }
 }
 
@@ -183,7 +184,8 @@ function snapshot() {
   const raw = {
     projects: doc.blocklist.projects,
     users: doc.blocklist.users,
-    reveal: { all: reveal.all, projectIds: Array.from(reveal.projectIds), userKeys: Array.from(reveal.userKeys) }
+    reveal: { all: reveal.all, projectIds: Array.from(reveal.projectIds), userKeys: Array.from(reveal.userKeys) },
+    clearBlockedMail: doc.settings.autoClearBlockedMail === true
   }
   return {
     accounts: doc.accounts,

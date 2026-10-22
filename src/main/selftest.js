@@ -301,6 +301,8 @@ async function run() {
             diag: ${JSON.stringify(diag)},
             hasRevealSwitch: !!document.getElementById('revealAll'),
             hasDumpSwitch: !!document.getElementById('dumpShapes'),
+            hasAutoClearSwitch: !!document.getElementById('autoClearMail'),
+            autoClearOffByDefault: !!document.getElementById('autoClearMail') && document.getElementById('autoClearMail').checked === false,
             projectRows: rows,
             userRows: document.querySelectorAll('#userTable tbody tr').length,
             accounts: document.querySelectorAll('#accountList li').length
@@ -310,6 +312,8 @@ async function run() {
       if (r.probeError) throw new Error('管理窗口脚本执行失败：' + r.probeError + ' | 页面报错: ' + errs.slice(0, 3).join(' | '))
       const fake = r.projectRows.find((line) => line.indexOf('999999') >= 0)
       if (!r.hasRevealSwitch || !r.hasDumpSwitch) throw new Error('设置开关没渲染出来：' + JSON.stringify(r))
+      if (!r.hasAutoClearSwitch) throw new Error('「自动标已读」开关没渲染出来：' + JSON.stringify(r))
+      if (!r.autoClearOffByDefault) throw new Error('「自动标已读」应当默认关闭')
       if (!fake) throw new Error('新加入的项目没有出现在管理窗口里：' + JSON.stringify(r))
       if (!/临时显示/.test(fake) || !/删除/.test(fake)) throw new Error('行内操作按钮缺失：' + fake)
       if (errs.length) throw new Error('管理窗口有报错：' + errs.slice(0, 3).join(' | '))

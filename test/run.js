@@ -230,5 +230,24 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('夹具里没有真实账号信息', offenders, [])
 }
 
+// 17. 开关「完全隐藏并自动标已读」打开后，私信列表才恢复整行移除
+{
+  const mails = fixture('mails_list.json')
+  const on = rules({ users: [{ id: 900001 }], clearBlockedMail: true })
+  const data = JSON.parse(JSON.stringify(mails))
+  P.filterJson(data, on, P.parseSiteUrl('/api/mails?page=1'))
+  check('开关开启：被屏蔽者的行整条消失', data.results.map((m) => m.id), [700002])
+  check('开关开启：rowCount 同步', data.rowCount, 1)
+
+  const off = rules({ users: [{ id: 900001 }] })
+  const kept = JSON.parse(JSON.stringify(mails))
+  P.filterJson(kept, off, P.parseSiteUrl('/api/mails?page=1'))
+  check('开关关闭（默认）：行保留，未读能点开清除', kept.results.length, 2)
+  check('开关只影响私信，不影响成员表等原有作用域', P.isUserRemoveScope('/projects/9/members', off), true)
+  const memberRow = JSON.parse(JSON.stringify(fixture('projects_10709_members_page_1_pageSize_3.json')))
+  P.filterJson(memberRow, on, P.parseSiteUrl('/api/projects/10709/members'))
+  check('成员表行为不随开关变化', memberRow.length, fixture('projects_10709_members_page_1_pageSize_3.json').filter((m) => m.user.id !== 900001).length)
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)
