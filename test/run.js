@@ -201,5 +201,24 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('消息：link.project 命中被屏蔽项目', byProject.results.map((m) => m.id), [800001])
 }
 
+// 16. 隐私护栏：夹具只放合成数据，真实账号信息一旦提交就会公开留在历史里
+{
+  const dir = path.join(__dirname, 'fixtures')
+  const offenders = []
+  for (const f of fs.readdirSync(dir)) {
+    if (!f.endsWith('.json')) continue
+    const text = fs.readFileSync(path.join(dir, f), 'utf8')
+    if (/avatars\.githubusercontent\.com|githubusercontent/.test(text)) offenders.push(f + ' 含真实头像域名')
+    const nameRe = /"(?:username|nickname)"\s*:\s*"([^"]*)"/g
+    let m
+    while ((m = nameRe.exec(text))) {
+      const value = m[1]
+      if (!/^(example|goodguy|other-guy|spammer|someone|ok|OK|小A|好人|喷子|路人|示例|我自己|已屏蔽)/.test(value)) offenders.push(f + ' 含疑似真实用户名 ' + value)
+    }
+    if (/@(?!(?:example|someone)\.)[a-z0-9.-]+\.(com|cn|net|org)/i.test(text.replace(/@example\.invalid/g, ''))) offenders.push(f + ' 含疑似真实邮箱')
+  }
+  check('夹具里没有真实账号信息', offenders, [])
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)
