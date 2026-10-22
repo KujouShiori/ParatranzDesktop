@@ -48,7 +48,7 @@ setup 会在 npm install 之后补一次 Electron 二进制。这一步不能省
     // @match    https://paratranz.cn/projects/*
     // ==/UserScript==
 
-- @match 与 @include 都认，语义按通配符处理；没写头部的脚本默认在所有站点页面运行。
+- 头部注释里的 match 与 include 两条规则都认，语义按通配符处理；没写头部的脚本默认在所有站点页面运行。
 - 脚本注入到页面主世界，能碰到站点自己的 DOM 和数据。
 - 插件排在屏蔽引擎之后运行，先接管 fetch 与 XMLHttpRequest 再轮到脚本，所以插件不能用来绕过屏蔽。
 - 单个脚本报错只点名它自己，不会连累其它脚本，也不会带崩屏蔽层。
