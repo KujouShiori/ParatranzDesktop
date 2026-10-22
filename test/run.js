@@ -172,5 +172,34 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('只记脱敏不记删除', [stats.maskedUsers, stats.droppedUsers], [1, 0])
 }
 
+// 14. 实测的私信列表：发信人被屏蔽整行消失，收信人被屏蔽只脱名不删行
+{
+  const mails = fixture('mails_list.json')
+  const asSender = JSON.parse(JSON.stringify(mails))
+  const s1 = P.filterJson(asSender, rules({ users: [{ id: 900001 }] }), P.parseSiteUrl('/api/mails?page=1'))
+  check('私信：发信人被屏蔽后整行消失', asSender.results.map((m) => m.id), [700002])
+  check('私信：rowCount 同步', asSender.rowCount, 1)
+  check('私信：留下的行不受影响', asSender.results[0].fromUser.username, 'other-guy')
+
+  const asRecipient = JSON.parse(JSON.stringify(mails))
+  P.filterJson(asRecipient, rules({ users: [{ id: 1 }] }), P.parseSiteUrl('/api/mails?page=1'))
+  check('私信：收信人被屏蔽时行还在', asRecipient.results.length, 2)
+  check('私信：收信人只脱名', asRecipient.results[0].toUser.username, P.MASK_TEXT)
+  check('私信：发信人不受收信人屏蔽影响', asRecipient.results[0].fromUser.username, 'example-sender')
+  check('私信：邮箱一并清空', asRecipient.results[0].toUser.email, '')
+}
+
+// 15. 实测的站内消息：没有 fromUser 只有数字 from 的变体也要按 id 拦掉
+{
+  const messages = fixture('messages_list.json')
+  const data = JSON.parse(JSON.stringify(messages))
+  P.filterJson(data, rules({ users: [{ id: 900001 }] }), P.parseSiteUrl('/api/messages?page=1'))
+  check('消息：带 fromUser 与只有数字 from 的两种都被拦', data.results.map((m) => m.id), [800003])
+
+  const byProject = JSON.parse(JSON.stringify(messages))
+  P.filterJson(byProject, rules({ projects: [{ id: 777 }] }), P.parseSiteUrl('/api/messages?page=1'))
+  check('消息：link.project 命中被屏蔽项目', byProject.results.map((m) => m.id), [800001])
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

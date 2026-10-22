@@ -1,0 +1,82 @@
+{
+  "results": [
+    {
+      "id": 700001,
+      "createdAt": "2026-10-22T11:00:00.000Z",
+      "from": 900001,
+      "to": 1,
+      "content": "第一句正文",
+      "html": "<p>第一句正文</p>",
+      "status": 0,
+      "uid": 900001,
+      "fromUser": {
+        "id": 900001,
+        "username": "example-sender",
+        "nickname": "示例发件人",
+        "bio": "个人简介",
+        "avatar": "/media/a.png",
+        "email": "sender@example.invalid",
+        "lastVisit": "2026-10-22T11:00:00.000Z",
+        "role": 1,
+        "points": 10
+      },
+      "toUser": {
+        "id": 1,
+        "username": "example-me",
+        "nickname": "我自己",
+        "bio": "",
+        "avatar": "/media/b.png",
+        "email": "me@example.invalid",
+        "lastVisit": "2026-10-22T11:00:00.000Z",
+        "role": 1,
+        "points": 5
+      },
+      "user": {
+        "id": 900001,
+        "username": "example-sender",
+        "nickname": "示例发件人",
+        "bio": "个人简介",
+        "avatar": "/media/a.png",
+        "email": "sender@example.invalid",
+        "lastVisit": "2026-10-22T11:00:00.000Z"
+      }
+    },
+    {
+      "id": 700002,
+      "createdAt": "2026-10-22T11:05:00.000Z",
+      "from": 900002,
+      "to": 1,
+      "content": "无关的人发的",
+      "html": "<p>无关的人发的</p>",
+      "status": 0,
+      "uid": 900002,
+      "fromUser": {
+        "id": 900002,
+        "username": "other-guy",
+        "nickname": "路人",
+        "bio": "",
+        "avatar": "/media/c.png",
+        "email": "other@example.invalid",
+        "lastVisit": "2026-10-22T11:05:00.000Z"
+      },
+      "toUser": {
+        "id": 1,
+        "username": "example-me",
+        "nickname": "我自己",
+        "bio": "",
+        "avatar": "/media/b.png",
+        "email": "me@example.invalid"
+      },
+      "user": {
+        "id": 900002,
+        "username": "other-guy",
+        "nickname": "路人",
+        "avatar": "/media/c.png"
+      }
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "rowCount": 2,
+  "pageCount": 1
+}

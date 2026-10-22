@@ -46,13 +46,25 @@ function keyOf(item, index) {
   return id + '|' + stamp + '|' + digest
 }
 
+// 私信与站内消息的真实字段（实测）：fromUser / toUser 是完整用户对象，
+// from / to / uid 是数字用户 id，messages 里有些条目只有数字 from 而没有 fromUser。
 function actors(item) {
   const out = []
-  for (const key of ['user', 'from', 'author', 'creator', 'sender']) {
+  for (const key of ['fromUser', 'user', 'toUser', 'from', 'author', 'creator', 'sender']) {
     const v = item && item[key]
     if (v && typeof v === 'object') out.push(v)
   }
   if (item && typeof item.username === 'string') out.push(item)
+  return out
+}
+
+function actorIds(item) {
+  const out = []
+  // 用户 id 是小整数；history 等接口的 from / to 是 1e12 量级时间戳，天然不会撞上
+  for (const key of ['from', 'uid', 'userId', 'user_id']) {
+    if (item && (key in item)) out.push(item[key])
+  }
+  for (const u of actors(item)) if (u && Number.isFinite(Number(u.id))) out.push(u.id)
   return out
 }
 
@@ -65,12 +77,22 @@ function projectIdsOf(item) {
     }
   }
   if (item && item.project && typeof item.project === 'object' && item.project.id) out.push(item.project.id)
+  // messages 的跳转信息在 link 里：{ id, title, project }
+  const link = item && item.link
+  if (link && typeof link === 'object') {
+    if (Number.isFinite(Number(link.project))) out.push(link.project)
+    if (link.project && typeof link.project === 'object' && link.project.id) out.push(link.project.id)
+  }
   return out
 }
 
 function shouldSkip(item, rules) {
   for (const id of projectIdsOf(item)) if (pure.projectBlocked(rules, id)) return true
   for (const u of actors(item)) if (pure.userEntityBlocked(rules, u)) return true
+  for (const id of actorIds(item)) {
+    const n = Number(id)
+    if (Number.isFinite(n) && n > 0 && n <= 1e9 && pure.userEntityBlocked(rules, { id: n })) return true
+  }
   return false
 }
 
@@ -86,15 +108,29 @@ function titleOf(item, feedId) {
   return parts.join(' ')
 }
 
+function flatten(value) {
+  const text = String(value).replace(/<[^>]{1,80}>/g, '').replace(/\s+/g, ' ').trim()
+  return text.length > 120 ? text.slice(0, 120) + '…' : text
+}
+
+// 实测：私信的 content 是字符串，站内消息的 content 是 { text: "..." }，
+// 另外 link.title 带着"哪一条被改了"这类可读文本
 function bodyOf(item) {
-  for (const key of ['title', 'subject', 'content', 'body', 'text', 'message', 'zh', 'value']) {
-    const v = item && item[key]
-    if (typeof v === 'string' && v.trim()) {
-      const s = v.replace(/\s+/g, ' ').trim()
-      return s.length > 120 ? s.slice(0, 120) + '…' : s
+  const content = item && item.content
+  if (typeof content === 'string' && content.trim()) return flatten(content)
+  if (content && typeof content === 'object') {
+    for (const key of ['text', 'content', 'body', 'title']) {
+      const v = content[key]
+      if (typeof v === 'string' && v.trim()) return flatten(v)
     }
   }
+  for (const key of ['title', 'subject', 'body', 'text', 'message']) {
+    const v = item && item[key]
+    if (typeof v === 'string' && v.trim()) return flatten(v)
+  }
+  const link = item && item.link
+  if (link && typeof link === 'object' && typeof link.title === 'string' && link.title.trim()) return flatten(link.title)
   return ''
 }
 
-module.exports = { actors, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }
+module.exports = { actorIds, actors, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }

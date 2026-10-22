@@ -18,7 +18,11 @@ const NON_PROJECT_KEYS = [
 const USER_ID_FIELD = /^(user_?id|uid)$/i
 const PROJECT_ID_FIELD = /^(project_?id|project)$/i
 
-const AUTHOR_KEYS = new Set(['user', 'from', 'author', 'creator', 'targetUser', 'reviewer', 'leader', 'owner'])
+// 真实返回里发信人是 fromUser、收信人是 toUser（私信与站内消息都是），
+// 而 from / to / uid 是数字用户 id。收信人不该让整行消失——那会连自己发出去的消息一起藏掉。
+const SENDER_KEYS = new Set(['user', 'fromUser', 'author', 'creator', 'sender', 'reviewer', 'leader', 'owner'])
+const RECIPIENT_KEYS = new Set(['toUser', 'targetUser'])
+const AUTHOR_KEYS = new Set([...SENDER_KEYS, ...RECIPIENT_KEYS])
 
 // apiPath 已去掉 /api 前缀，所以这里从 /projects 开始写
 const USER_REMOVE_SCOPES = [
@@ -35,6 +39,7 @@ const USER_REMOVE_SCOPES = [
   /^\/users\/leaderboard(\/|$)/,
   /^\/leaderboard(\/|$)/,
   /^\/mails(\/|$)/,
+  /^\/messages(\/|$)/,
   /^\/broadcasts(\/|$)/,
   /^\/comments(\/|$)/,
   /^\/users\/online(\/|$)/
@@ -138,13 +143,33 @@ function carriesBlockedProject(o, rules) {
     // 真实返回里项目引用常常是对象：{ id, name }
     if (v && typeof v === 'object' && Number.isFinite(Number(v.id)) && projectBlocked(rules, v.id)) return v.id
   }
+  // 站内消息把所属项目放在 link.project 里
+  const link = o.link
+  if (link && typeof link === 'object') {
+    const p = link.project
+    if ((typeof p === 'number' || typeof p === 'string') && projectBlocked(rules, p)) return p
+    if (p && typeof p === 'object' && projectBlocked(rules, p.id)) return p.id
+  }
   return 0
 }
 
+// 用户 id 是小整数，而 history 一类接口的 from / to 是 1e12 量级的时间戳，
+// 用取值范围区分比按字段名猜可靠
+function userBlockedById(rules, id) {
+  const n = Number(id)
+  if (!Number.isFinite(n) || n <= 0 || n > 1e9) return false
+  if (rules.revealAll || rules.revealUsers.has('id:' + n)) return false
+  return rules.userIds.has(n)
+}
+
 function blockedUserInRow(row, rules) {
-  for (const key of AUTHOR_KEYS) {
+  for (const key of SENDER_KEYS) {
     const v = row[key]
     if (v && typeof v === 'object' && isUserEntity(v) && userEntityBlocked(rules, v)) return true
+  }
+  // messages 里有一种条目不带 fromUser，只有数字 from，这时只能按 id 拦
+  for (const key of ['from', 'uid', 'userId', 'user_id']) {
+    if (key in row && userBlockedById(rules, row[key])) return true
   }
   return false
 }
@@ -278,7 +303,7 @@ function filterJson(data, rules, urlInfo, stats) {
         continue
       }
       if (isUserEntity(value) && userEntityBlocked(rules, value)) {
-        if (AUTHOR_KEYS.has(key)) {
+        if (SENDER_KEYS.has(key)) {
           if (removeUsers) {
             node[key] = null
             s.droppedUsers++
@@ -310,6 +335,9 @@ function buildRulesState(rules) {
 
 module.exports = {
   AUTHOR_KEYS,
+  SENDER_KEYS,
+  RECIPIENT_KEYS,
+  userBlockedById,
   MASK_TEXT,
   PROJECT_CORE_KEYS,
   NON_PROJECT_KEYS,

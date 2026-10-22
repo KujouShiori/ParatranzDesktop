@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "id": 800001,
+      "createdAt": "2026-10-22T11:10:00.000Z",
+      "from": 900001,
+      "to": 1,
+      "type": "review.passed",
+      "content": { "text": "你的译文已通过审核" },
+      "status": 0,
+      "target": "string",
+      "tid": 555001,
+      "link": { "id": 555001, "title": "a/b.txt|24 的译文", "project": 18245 },
+      "fromUser": {
+        "id": 900001,
+        "username": "example-sender",
+        "nickname": "示例发件人",
+        "bio": "",
+        "avatar": "/media/a.png",
+        "email": "",
+        "role": 1
+      }
+    },
+    {
+      "id": 800002,
+      "createdAt": "2026-10-22T11:11:00.000Z",
+      "from": 900001,
+      "to": 1,
+      "type": "comment.new",
+      "content": { "text": "有人新增了评论" },
+      "status": 0,
+      "target": "term",
+      "tid": 555002,
+      "link": { "id": 555002, "title": "某词条的评论", "project": 777 }
+    },
+    {
+      "id": 800003,
+      "createdAt": "2026-10-22T11:12:00.000Z",
+      "from": 900003,
+      "to": 1,
+      "type": "task.assigned",
+      "content": { "text": "你被加入了新任务" },
+      "status": 0,
+      "target": "task",
+      "tid": 555003,
+      "link": { "id": 555003, "title": "第三十章 校对", "project": 777 },
+      "fromUser": {
+        "id": 900003,
+        "username": "other-guy",
+        "nickname": "路人",
+        "bio": "",
+        "avatar": "/media/c.png",
+        "email": ""
+      }
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "rowCount": 3,
+  "pageCount": 1
+}

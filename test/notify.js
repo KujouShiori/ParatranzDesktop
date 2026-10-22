@@ -85,5 +85,38 @@ check('内联 project 对象识别', shape.projectIdsOf({ project: { id: 12, nam
   check('同一条超长正文稳定', shape.keyOf(longA, 0) === shape.keyOf({ id: 1, content: '啊'.repeat(300) }, 0), true)
 }
 
+// 实测形状：私信 { results:[{ id, from, to, content, html, fromUser, toUser, uid, user }] }
+// 消息 { results:[{ id, from, to, type, content:{text}, target, tid, link:{id,title,project}, fromUser? }] }
+{
+  const mails = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'mails_list.json'), 'utf8'))
+  const messages = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'messages_list.json'), 'utf8'))
+  const mailItems = shape.itemsOf(mails)
+  const msgItems = shape.itemsOf(messages)
+
+  check('私信条目数', mailItems.length, 2)
+  check('消息条目数', msgItems.length, 3)
+
+  const bySender = rules({ users: [{ id: 900001 }] })
+  check('私信：发信人被屏蔽就不提醒', mailItems.filter((i) => shape.shouldSkip(i, bySender)).length, 1)
+  check('消息：带 fromUser 的条目被拦', msgItems.filter((i) => shape.shouldSkip(i, bySender)).length, 2)
+
+  const byName = rules({ users: [{ username: 'example-sender' }] })
+  check('私信：按用户名也能拦', mailItems.filter((i) => shape.shouldSkip(i, byName)).length, 1)
+
+  const byRecipient = rules({ users: [{ id: 1 }] })
+  check('私信：对方是收信人时同样不提醒', mailItems.filter((i) => shape.shouldSkip(i, byRecipient)).length, 2)
+
+  const byProject = rules({ projects: [{ id: 777 }] })
+  check('消息：link.project 命中被屏蔽项目', msgItems.filter((i) => shape.shouldSkip(i, byProject)).length, 2)
+  check('link.project 被识别为项目引用', shape.projectIdsOf(msgItems[0]), [18245])
+
+  check('消息正文取自 content.text', shape.bodyOf(msgItems[0]), '你的译文已通过审核')
+  check('正文回退到 link.title', shape.bodyOf({ id: 1, link: { title: '某词条的评论' } }), '某词条的评论')
+  check('私信正文用 content 字符串', shape.bodyOf(mailItems[1]), '无关的人发的')
+  check('标题优先用 fromUser 昵称', shape.titleOf(msgItems[0], 'messages'), '示例发件人 消息')
+  check('空名单一条都不拦', msgItems.filter((i) => shape.shouldSkip(i, rules({}))).length, 0)
+  check('时间戳不会被当成用户 id', shape.shouldSkip({ id: 1, from: 1697000000000, to: 1697000001000 }, rules({ users: [{ id: 1697000000000 }] })), false)
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

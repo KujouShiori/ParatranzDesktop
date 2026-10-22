@@ -19,7 +19,9 @@ module.exports = function shieldEngine(config) {
   ]
   const USER_ID_FIELD = /^(user_?id|uid)$/i
   const PROJECT_ID_FIELD = /^(project_?id|project)$/i
-  const AUTHOR_KEYS = ['user', 'from', 'author', 'creator', 'targetUser', 'reviewer', 'leader', 'owner']
+  const SENDER_KEYS = ['user', 'fromUser', 'author', 'creator', 'sender', 'reviewer', 'leader', 'owner']
+  const RECIPIENT_KEYS = ['toUser', 'targetUser']
+  const AUTHOR_KEYS = SENDER_KEYS.concat(RECIPIENT_KEYS)
   const ENVELOPE_LIST_KEYS = ['results', 'data', 'items', 'list', 'rows', 'records']
   // 在这些接口里，屏蔽用户等于「整条消失」；其它接口（词条、译文）只脱名，绝不能少数据
   const USER_REMOVE_SCOPES = [
@@ -36,6 +38,7 @@ module.exports = function shieldEngine(config) {
     /^\/users\/leaderboard(\/|$)/,
     /^\/leaderboard(\/|$)/,
     /^\/mails(\/|$)/,
+    /^\/messages(\/|$)/,
     /^\/broadcasts(\/|$)/,
     /^\/comments(\/|$)/,
     /^\/users\/online(\/|$)/
@@ -114,13 +117,32 @@ module.exports = function shieldEngine(config) {
       if ((typeof v === 'number' || typeof v === 'string') && projectBlocked(v)) return true
       if (v && typeof v === 'object' && Number.isFinite(Number(v.id)) && projectBlocked(v.id)) return true
     }
+    // 站内消息把所属项目放在 link.project 里
+    const link = o.link
+    if (link && typeof link === 'object') {
+      const p = link.project
+      if ((typeof p === 'number' || typeof p === 'string') && projectBlocked(p)) return true
+      if (p && typeof p === 'object' && projectBlocked(p.id)) return true
+    }
     return false
   }
 
+  // 用户 id 是小整数，而 history 一类接口的 from / to 是 1e12 量级的时间戳
+  function userBlockedById(id) {
+    const n = Number(id)
+    if (!Number.isFinite(n) || n <= 0 || n > 1e9) return false
+    if (rules.revealAll || rules.revealUsers.has('id:' + n)) return false
+    return rules.userIds.has(n)
+  }
+
   function blockedUserInRow(row) {
-    for (const key of AUTHOR_KEYS) {
+    for (const key of SENDER_KEYS) {
       const v = row[key]
       if (v && typeof v === 'object' && isUserEntity(v) && userEntityBlocked(v)) return true
+    }
+    // messages 里有一种条目不带 fromUser，只有数字 from，这时只能按 id 拦
+    for (const key of ['from', 'uid', 'userId', 'user_id']) {
+      if (key in row && userBlockedById(row[key])) return true
     }
     return false
   }
@@ -237,7 +259,7 @@ module.exports = function shieldEngine(config) {
           continue
         }
         if (isUserEntity(value) && userEntityBlocked(value)) {
-          if (AUTHOR_KEYS.indexOf(key) >= 0) {
+          if (SENDER_KEYS.indexOf(key) >= 0) {
             if (removeUsers) {
               node[key] = null
               stats.droppedUsers++
