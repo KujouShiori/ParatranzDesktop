@@ -172,33 +172,43 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('只记脱敏不记删除', [stats.maskedUsers, stats.droppedUsers], [1, 0])
 }
 
-// 14. 实测的私信列表：发信人被屏蔽整行消失，收信人被屏蔽只脱名不删行
+// 14. 私信列表：发信人被屏蔽时保留行（否则未读角标点不开、清不掉），但脱名 + 藏正文
 {
   const mails = fixture('mails_list.json')
-  const asSender = JSON.parse(JSON.stringify(mails))
-  const s1 = P.filterJson(asSender, rules({ users: [{ id: 900001 }] }), P.parseSiteUrl('/api/mails?page=1'))
-  check('私信：发信人被屏蔽后整行消失', asSender.results.map((m) => m.id), [700002])
-  check('私信：rowCount 同步', asSender.rowCount, 1)
-  check('私信：留下的行不受影响', asSender.results[0].fromUser.username, 'other-guy')
+  const data = JSON.parse(JSON.stringify(mails))
+  const s = P.filterJson(data, rules({ users: [{ id: 900001 }] }), P.parseSiteUrl('/api/mails?page=1'))
+  check('私信：行保留，未读仍可点开清除', data.results.map((m) => m.id), [700001, 700002])
+  check('私信：rowCount 不变', data.rowCount, 2)
+  check('私信：发信人脱名', data.results[0].fromUser.username, P.MASK_TEXT)
+  check('私信：镜像的 user 也脱名', data.results[0].user.username, P.MASK_TEXT)
+  check('私信：正文被藏起来', data.results[0].content, '内容已隐藏（来自被屏蔽用户）')
+  check('私信：html 预览也被藏起来', data.results[0].html, '内容已隐藏（来自被屏蔽用户）')
+  check('私信：邮箱一并清空', data.results[0].fromUser.email, '')
+  check('私信：无关的那条正文不受影响', data.results[1].content, '无关的人发的')
+  check('私信：按脱名计数不记删除', [s.maskedUsers > 0, s.droppedUsers], [true, 0])
 
   const asRecipient = JSON.parse(JSON.stringify(mails))
   P.filterJson(asRecipient, rules({ users: [{ id: 1 }] }), P.parseSiteUrl('/api/mails?page=1'))
   check('私信：收信人被屏蔽时行还在', asRecipient.results.length, 2)
   check('私信：收信人只脱名', asRecipient.results[0].toUser.username, P.MASK_TEXT)
   check('私信：发信人不受收信人屏蔽影响', asRecipient.results[0].fromUser.username, 'example-sender')
-  check('私信：邮箱一并清空', asRecipient.results[0].toUser.email, '')
+  check('私信：收信人屏蔽不动正文', asRecipient.results[0].content, '第一句正文')
 }
 
-// 15. 实测的站内消息：没有 fromUser 只有数字 from 的变体也要按 id 拦掉
+// 15. 站内消息：没有 fromUser 只有数字 from 的变体也要藏正文
 {
   const messages = fixture('messages_list.json')
   const data = JSON.parse(JSON.stringify(messages))
   P.filterJson(data, rules({ users: [{ id: 900001 }] }), P.parseSiteUrl('/api/messages?page=1'))
-  check('消息：带 fromUser 与只有数字 from 的两种都被拦', data.results.map((m) => m.id), [800003])
+  check('消息：三条都保留', data.results.map((m) => m.id), [800001, 800002, 800003])
+  check('消息：带 fromUser 的脱名', data.results[0].fromUser.username, P.MASK_TEXT)
+  check('消息：正文对象里的 text 被藏', data.results[0].content.text, '内容已隐藏（来自被屏蔽用户）')
+  check('消息：只有数字 from 的变体也藏正文', data.results[1].content.text, '内容已隐藏（来自被屏蔽用户）')
+  check('消息：无关那条正文完好', data.results[2].content.text, '你被加入了新任务')
 
   const byProject = JSON.parse(JSON.stringify(messages))
   P.filterJson(byProject, rules({ projects: [{ id: 777 }] }), P.parseSiteUrl('/api/messages?page=1'))
-  check('消息：link.project 命中被屏蔽项目', byProject.results.map((m) => m.id), [800001])
+  check('消息：link.project 命中被屏蔽项目时整条移除', byProject.results.map((m) => m.id), [800001])
 }
 
 // 16. 隐私护栏：夹具只放合成数据，真实账号信息一旦提交就会公开留在历史里

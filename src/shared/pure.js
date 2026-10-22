@@ -38,8 +38,8 @@ const USER_REMOVE_SCOPES = [
   /^\/users\/\d+\/activities(\/|$)/,
   /^\/users\/leaderboard(\/|$)/,
   /^\/leaderboard(\/|$)/,
-  /^\/mails(\/|$)/,
-  /^\/messages(\/|$)/,
+  // /mails 与 /messages 故意不进移除名单：整行删掉的话，未读角标就点不开、清不掉，
+  // 屏蔽反而把通知栏卡死。这两处改为「保留行 + 脱名 + 藏正文」。
   /^\/broadcasts(\/|$)/,
   /^\/comments(\/|$)/,
   /^\/users\/online(\/|$)/
@@ -57,6 +57,17 @@ function hardBlockBody(projectId) {
 }
 
 const MASK_TEXT = '已屏蔽用户'
+const HIDDEN_BODY = '内容已隐藏（来自被屏蔽用户）'
+
+// 只处理正文类字段；词条的 term / translation / note 等数据一律不碰，
+// 屏蔽用户不该改动项目内容本身。
+function hideRowBody(row) {
+  if (typeof row.content === 'string') row.content = HIDDEN_BODY
+  else if (row.content && typeof row.content === 'object' && typeof row.content.text === 'string') row.content.text = HIDDEN_BODY
+  if (typeof row.html === 'string') row.html = HIDDEN_BODY
+  if (typeof row.text === 'string') row.text = HIDDEN_BODY
+  return row
+}
 
 function normalizeRules(raw) {
   const rules = {
@@ -278,6 +289,7 @@ function filterJson(data, rules, urlInfo, stats) {
             s.droppedUsers++
             continue
           }
+          hideRowBody(el)
           walk(el, depth + 1)
           continue
         }
