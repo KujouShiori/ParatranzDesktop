@@ -10,6 +10,21 @@ const store = require('./store')
 const OUT = () => path.join(app.getPath('userData'), 'selftest')
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+// 截图只是给人看证据的，抓不到不该把整条自检判红
+async function shoot(wc, name) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const img = await wc.capturePage()
+      const file = path.join(OUT(), name + '.png')
+      fs.writeFileSync(file, img.toPNG())
+      return { file: file }
+    } catch (e) {
+      await sleep(1200)
+      if (attempt === 3) return { captureError: String(e && e.message ? e.message : e) }
+    }
+  }
+}
+
 function waitFinishLoad(wc) {
   return new Promise((resolve, reject) => {
     const ok = () => { cleanup(); resolve() }
@@ -201,11 +216,7 @@ async function run() {
     return r
   })
 
-  await step('截图：屏蔽墙', () => wc.capturePage().then((img) => {
-    const file = path.join(OUT(), 'wall.png')
-    fs.writeFileSync(file, img.toPNG())
-    return { file: file }
-  }))
+  await step('截图：屏蔽墙', () => shoot(wc, 'wall'))
 
   await step('临时解除后内容恢复可见', async () => {
     store.revealProject(victim.id)
@@ -246,11 +257,7 @@ async function run() {
     return r
   })
 
-  await step('截图：术语表页面', () => wc.capturePage().then((img) => {
-    const file = path.join(OUT(), 'terms.png')
-    fs.writeFileSync(file, img.toPNG())
-    return { file: file }
-  }))
+  await step('截图：术语表页面', () => shoot(wc, 'terms'))
 
   await step('清理：靶子从名单里移除', async () => {
     if (victimInStore) store.removeProject(victim.id)
@@ -440,6 +447,19 @@ async function run() {
       messages: probe.messages && { status: probe.messages.status, count: probe.messages.count, keys: probe.messages.first && Object.keys(probe.messages.first) },
       broadcasts: probe.broadcasts && { status: probe.broadcasts.status, count: probe.broadcasts.count }
     }
+  })
+
+  await step('托盘图标真的画出来了', () => {
+    const info = require('./tray').iconInfo()
+    if (info.empty) throw new Error('托盘图标是空的：' + JSON.stringify(info))
+    if (!info.fromFile) throw new Error('没找到 ico，退回位图，可能显示成空白：' + JSON.stringify(info))
+    return info
+  })
+
+  await step('未读计数快探能跑', async () => {
+    const notifications = require('./notifications')
+    await notifications.fastProbe()
+    return { probed: true }
   })
 
   await step('退出前名单不含自检残留', () => {

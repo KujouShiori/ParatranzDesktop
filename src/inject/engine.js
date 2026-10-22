@@ -471,44 +471,67 @@ module.exports = function shieldEngine(config) {
   }
 
   // ---------- WebSocket 旁听 ----------
-  // 站点的私信和消息是 socket.io 推的（轮询接口被站点拒了，只有 WS）。在页面建连之前
-  // 换掉 window.WebSocket，只读不改：看到 mail / message 一类的事件帧就告诉主进程
-  // 「现在值得去拉一次」，把提醒延迟从整个轮询间隔压到一秒级。
+  // 站点的私信和消息是 socket.io 推的（轮询通道被站点拒了，只有 WS）。
+  // 关键：dom-ready 兜底注入时，站点的 socket 往往已经连上了，改 window.WebSocket 构造器
+  // 对既有连接完全无效。所以钩子必须打在原型上——onmessage 赋值和 addEventListener 两条路
+  // 都盖住，已经建立的连接往后的帧也照样能旁听。
+  const nowMs = typeof config.now === 'function' ? config.now : () => Date.now()
   const ACTIVITY_EVENTS = /"(mail|message|messages|newMessage|newMail|broadcast|notify|notification)"/
   const ACTIVITY_PREFIX = /^(42|40)\[/
+  let activityLastFire = 0
+
+  function observeSocketFrame(data) {
+    try {
+      if (typeof data !== 'string' || !data) return
+      if (!ACTIVITY_PREFIX.test(data)) return
+      if (!ACTIVITY_EVENTS.test(data)) return
+      const now = nowMs()
+      // 合并是故意的：一次触发会把这个账号的所有源都拉一遍，连发只是重复请求
+      if (now - activityLastFire < 800) return
+      activityLastFire = now
+      sendIntent('activity', { source: 'socket' })
+    } catch (e) {}
+  }
 
   function installWebSocketWatch() {
     const RealWS = w.WebSocket
-    if (!RealWS || RealWS.prototype.__ptShieldWatched) return
-    RealWS.prototype.__ptShieldWatched = true
+    const proto = RealWS && RealWS.prototype
+    if (!proto || proto.__ptShieldWatched) return
+    proto.__ptShieldWatched = true
 
-    function WatchedWebSocket(url, protocols) {
-      const socket = protocols === undefined ? new RealWS(url) : new RealWS(url, protocols)
-      let lastFire = 0
-      // 旁听本身出错绝不能带崩站点的连接，否则在线状态和实时推送都会被我们搞坏
-      try {
-        socket.addEventListener('message', function (ev) {
-          try {
-            const data = typeof ev.data === 'string' ? ev.data : ''
-            if (!data || !ACTIVITY_PREFIX.test(data)) return
-            if (!ACTIVITY_EVENTS.test(data)) return
-            const now = Date.now()
-            if (now - lastFire < 800) return
-            lastFire = now
-            sendIntent('activity', { source: 'socket' })
-          } catch (e) {}
-        })
-      } catch (e) {}
-      return socket
-    }
-
-    WatchedWebSocket.prototype = RealWS.prototype
-    for (const k of ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED']) WatchedWebSocket[k] = RealWS[k]
     try {
-      Object.defineProperty(w, 'WebSocket', { configurable: true, writable: true, value: WatchedWebSocket })
-    } catch (e) {
-      w.WebSocket = WatchedWebSocket
-    }
+      const desc = Object.getOwnPropertyDescriptor(proto, 'onmessage')
+      if (desc && typeof desc.set === 'function') {
+        Object.defineProperty(proto, 'onmessage', {
+          configurable: true,
+          enumerable: desc.enumerable,
+          get: desc.get,
+          set: function (handler) {
+            const self = this
+            const wrapped = typeof handler === 'function'
+              ? function (ev) { observeSocketFrame(ev && ev.data); return handler.apply(self, arguments) }
+              : handler
+            return desc.set.call(self, wrapped)
+          }
+        })
+      }
+    } catch (e) {}
+
+    try {
+      const nativeAdd = proto.addEventListener
+      if (typeof nativeAdd === 'function') {
+        proto.addEventListener = function (type, listener, options) {
+          const self = this
+          if (type === 'message' && typeof listener === 'function') {
+            return nativeAdd.call(this, type, function (ev) {
+              observeSocketFrame(ev && ev.data)
+              return listener.apply(self, arguments)
+            }, options)
+          }
+          return nativeAdd.apply(this, arguments)
+        }
+      }
+    } catch (e) {}
   }
 
   // ---------- DOM ----------

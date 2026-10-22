@@ -1,5 +1,7 @@
 'use strict'
 
+const fs = require('fs')
+const path = require('path')
 const { Tray, Menu, nativeImage, globalShortcut, BrowserWindow } = require('electron')
 const store = require('./store')
 const windows = require('./windows')
@@ -8,7 +10,30 @@ const menu = require('./menu')
 
 let tray = null
 
+function iconCandidates() {
+  return [
+    path.join(__dirname, '..', '..', 'build', 'icon.ico'),
+    path.join(process.resourcesPath || '', 'build', 'icon.ico')
+  ]
+}
+
 function trayIcon() {
+  // 优先用 ico 文件：程序化位图在部分 Windows 上会被画成空白，托盘看起来就是"没有图标"
+  for (const file of iconCandidates()) {
+    if (file && fs.existsSync(file)) {
+      const img = nativeImage.createFromPath(file)
+      if (!img.isEmpty()) {
+        const sized = img.resize({ width: 16, height: 16 })
+        if (!sized.isEmpty()) return sized
+        return img
+      }
+    }
+  }
+  console.warn('[托盘] 找不到 ico，退回位图绘制')
+  return bitmapIcon()
+}
+
+function bitmapIcon() {
   const size = 16
   const buf = Buffer.alloc(size * size * 4)
   const c = (size - 1) / 2
@@ -103,6 +128,12 @@ function refresh() {
   menu.syncMenuRevealState()
 }
 
+function iconInfo() {
+  const img = trayIcon()
+  const used = iconCandidates().find((f) => f && fs.existsSync(f))
+  return { fromFile: used || null, empty: img.isEmpty(), width: img.getSize().width, height: img.getSize().height }
+}
+
 function installTray() {
   tray = new Tray(trayIcon())
   tray.setToolTip('Paratranz Desktop')
@@ -156,4 +187,4 @@ function destroyTray() {
   }
 }
 
-module.exports = { installTray, installShortcuts, removeShortcuts, destroyTray, refreshTray: refresh, focusMain, hintHidden, badgeIcon }
+module.exports = { installTray, iconInfo, installShortcuts, removeShortcuts, destroyTray, refreshTray: refresh, focusMain, hintHidden, badgeIcon }

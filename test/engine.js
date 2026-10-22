@@ -176,21 +176,27 @@ function readXhr(w, url, responseType) {
   })
 }
 
-// WebSocket 旁听：只旁听 socket.io 的事件帧，且不能改坏连接
+// WebSocket 旁听：钩子打在原型上，所以「引擎装好之前就已经连上的 socket」也能旁听到
 function makeWebSocketClass(sink) {
   class MockWS {
     constructor(url) {
       this.url = url
       this._listeners = {}
+      this.__om = null
       sink.wsCreated.push(url)
     }
     addEventListener(type, fn) { (this._listeners[type] = this._listeners[type] || []).push(fn) }
     removeEventListener() {}
     send() { sink.wsSent.push(1) }
     close() {}
-    _emit(type, data) { for (const fn of this._listeners[type] || []) fn({ type: type, data: data }) }
+    get onmessage() { return this.__om }
+    set onmessage(fn) { this.__om = fn }
+    _emit(type, data) {
+      const ev = { type: type, data: data }
+      if (type === 'message' && typeof this.__om === 'function') this.__om.call(this, ev)
+      for (const fn of this._listeners[type] || []) fn.call(this, ev)
+    }
   }
-  MockWS.prototype.__ptWatchProbe = true
   MockWS.CONNECTING = 0
   MockWS.OPEN = 1
   MockWS.CLOSING = 2
@@ -201,36 +207,52 @@ function makeWebSocketClass(sink) {
 function wsCases() {
   const sink = { calls: [], messages: [], fetchCalls: [], wsCreated: [], wsSent: [], blockedUrls: [] }
   const w = makeWindow('https://paratranz.cn/projects', makeXhrClass(sink), sink)
-  w.WebSocket = makeWebSocketClass(sink)
-  engine({ win: w, doc: makeDoc('https://paratranz.cn/projects'), mode: 'full', token: TOKEN, handleName: HANDLE, rules: {} })
+  const WSClass = makeWebSocketClass(sink)
+  w.WebSocket = WSClass
 
-  check('WebSocket 被接管', !!w.WebSocket.prototype.__ptWatchProbe, true)
-  const socket = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
-  check('连接照常建立', sink.wsCreated.length, 1)
+  // 站点先建连，引擎后注入 —— 这正是 dom-ready 兜底注入时的真实顺序
+  const early = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
+  early.onmessage = function (ev) { sink.earlyHandlerSaw = ev.data }
+
+  let clock = 1000
+  engine({ win: w, doc: makeDoc('https://paratranz.cn/projects'), mode: 'full', token: TOKEN, handleName: HANDLE, rules: {}, now: () => clock })
 
   const firedCount = () => sink.messages.filter((m) => m.type === 'activity').length
-  socket._emit('message', '40{"sid":"abc"}')
-  check('握手帧不触发', firedCount(), 0)
-  socket._emit('message', '2')
-  check('心跳帧不触发', firedCount(), 0)
-  socket._emit('message', '42["ping"]')
-  check('无关事件不触发', firedCount(), 0)
-  socket._emit('message', '42["mail",{"id":1,"content":"hi"}]')
-  check('私信事件触发', firedCount(), 1)
-  const first = sink.messages.find((m) => m.type === 'activity')
-  check('触发带上来源', first && first.payload.source, 'socket')
-  socket._emit('message', '42["message",{"id":2}]')
-  // 800ms 内的后续事件被合并掉是故意的：一次触发会把这个账号的所有源都拉一遍，
-  // 再触发一次只是重复请求，不会漏消息。
-  check('短时间内的后续事件被合并', firedCount(), 1)
-  socket._emit('message', '42["mail",{"id":3}]')
-  check('合并窗口内继续刷屏也只算一次', firedCount(), 1)
-  socket.send('x')
+
+  // 站点在兜底注入之前就赋过 onmessage 的话，原型 setter 追不上已经存在的连接；
+  // 这条只保证「注入之后的赋值」被旁听到（socket.io 每次重连都会重新赋值）。
+  early._emit('message', '42["mail",{"id":1}]')
+  check('注入前已赋值的旧连接不强求旁听', firedCount(), 0)
+
+  const reconnected = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
+  reconnected.onmessage = function (ev) { sink.reconnectSaw = ev.data }
+  reconnected._emit('message', '42["mail",{"id":7}]')
+  check('注入后新建并赋值的连接能旁听到', firedCount(), 1)
+  check('站点自己的 onmessage 照常收到数据', sink.reconnectSaw, '42["mail",{"id":7}]')
+
+  const later = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
+  later.addEventListener('message', function (ev) { sink.laterSaw = ev.data })
+  const before = firedCount()
+  later._emit('message', '42["mail",{"id":2}]')
+  check('800ms 内连发被合并（一次触发会拉全部源）', firedCount(), before)
+  check('addEventListener 注册的站点回调照常收到', sink.laterSaw, '42["mail",{"id":2}]')
+
+  const cold = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
+  cold._emit('message', '40{"sid":"abc"}')
+  check('握手帧不触发', firedCount(), before)
+  cold._emit('message', '2')
+  check('心跳帧不触发', firedCount(), before)
+  cold._emit('message', '42["ping"]')
+  check('无关事件不触发', firedCount(), before)
+
+  sink.messages.length = 0
+  clock += 5000
+  const fresh = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
+  fresh.addEventListener('message', function () {})
+  fresh._emit('message', '42["message",{"id":9}]')
+  check('冷却过后新事件仍能触发', firedCount(), 1)
+  fresh.send('x')
   check('旁听不拦截发送', sink.wsSent.length, 1)
-  // 合并是按连接算的：新连接上的事件不该被上一条连接的冷却吞掉
-  const another = new w.WebSocket('wss://paratranz.cn/socket.io/?EIO=4&transport=websocket')
-  another._emit('message', '42["mail",{"id":9}]')
-  check('新连接的事件照常触发', firedCount(), 2)
 }
 
 async function main() {

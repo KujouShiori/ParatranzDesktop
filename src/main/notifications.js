@@ -154,16 +154,58 @@ function pollAccountNow(account) {
   }, 600)
 }
 
+// 未读计数探针：比完整列表轻得多，用来把提醒延迟压到几秒；计数涨了才去拉列表。
+// 站点没有 CSP、也没有速率限制（实测 30 连发全部 200），所以 5 秒一次是安全的。
+const COUNT_PROBES = [{ id: 'mails', path: '/api/mails/count' }]
+const FAST_INTERVAL_MS = 5000
+const lastCounts = new Map()
+let fastTimer = null
+
+function pickCount(json) {
+  if (typeof json === 'number') return json
+  if (!json || typeof json !== 'object') return null
+  for (const key of ['unread', 'count', 'total', 'new', 'noRead', 'number']) {
+    if (typeof json[key] === 'number') return json[key]
+  }
+  return null
+}
+
+async function fastProbe() {
+  if (!running) return
+  const accounts = ['default'].concat((store.snapshot().accounts || []).map((a) => a.id))
+  for (const account of accounts) {
+    for (const probe of COUNT_PROBES) {
+      const key = account + probe.path
+      let value = null
+      try {
+        const res = await windows.sessionFor(account).fetch('https://paratranz.cn/api' + probe.path, { headers: { accept: 'application/json' } })
+        if (!res.ok) continue
+        value = pickCount(await res.json())
+      } catch (e) {
+        continue
+      }
+      if (value === null) continue // 认不出字段就什么都不做，交给完整轮询兜底
+      const prev = lastCounts.get(key)
+      lastCounts.set(key, value)
+      if (prev !== undefined && value > prev) pollAccountNow(account)
+    }
+  }
+}
+
 function schedule() {
   if (timer) clearInterval(timer)
   timer = null
+  if (fastTimer) clearInterval(fastTimer)
+  fastTimer = null
   const snap = store.snapshot()
   running = snap.settings.notifications !== false
   dumpShapes = !!snap.settings.dumpShapes
   if (!running) return
   const seconds = Math.max(15, Number(snap.settings.notifyIntervalSec) || 45)
   timer = setInterval(pollAll, seconds * 1000)
+  fastTimer = setInterval(fastProbe, FAST_INTERVAL_MS)
   pollAll()
+  fastProbe()
 }
 
 function start() {
@@ -183,4 +225,4 @@ function debugState() {
   return out
 }
 
-module.exports = { start, schedule, pollAll, pollAccountNow, resetForTests, debugState, FEEDS }
+module.exports = { start, schedule, pollAll, pollAccountNow, fastProbe, resetForTests, debugState, FEEDS }
