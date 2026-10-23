@@ -18,7 +18,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     app.setAppUserModelId('cn.paratranz.desktop')
     store.load()
-    windows.setRules(store.snapshot())
+    windows.applyRules(store.snapshot())
     windows.setContextMenuHandler(menu.pageContextMenu)
     windows.registerIpc()
     manage.registerManageIpc()

@@ -96,6 +96,21 @@ function shouldSkip(item, rules) {
   return false
 }
 
+// 自己发出去的那条不该提醒。私信与消息列表都带数字 from（发信人 id），
+// 列表按时间倒序，我刚发出去的一条会以「新条目」出现，不认出自己的 id 就会提醒自己。
+// 只认发信人字段：收信人是自己不算，会话行里的 user 是对面的人，两者都不能混用。
+function isSelfAuthored(item, myId) {
+  const mine = Number(myId)
+  if (!Number.isFinite(mine) || mine <= 0) return false
+  for (const key of ['from', 'fromUser', 'sender', 'author', 'creator']) {
+    const v = item && item[key]
+    if (v === undefined || v === null) continue
+    const id = typeof v === 'object' ? v.id : v
+    if (Number(id) === mine) return true
+  }
+  return false
+}
+
 const KIND_LABEL = { mails: '站内信', messages: '消息', broadcasts: '公告' }
 
 function titleOf(item, feedId) {
@@ -150,4 +165,4 @@ function blockedUnreadConversations(items, rules, myId) {
   return Array.from(out)
 }
 
-module.exports = { blockedUnreadConversations, bodyOf, idOf, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }
+module.exports = { blockedUnreadConversations, bodyOf, idOf, isSelfAuthored, itemsOf, keyOf, projectIdsOf, shouldSkip, titleOf }

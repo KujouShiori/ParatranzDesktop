@@ -32,12 +32,24 @@ function setQuitting(on) {
   quitting = !!on
 }
 
-function setRules(snapshot) {
+function applyRules(snapshot) {
+  const prev = currentRules
   currentRules = pure.normalizeRules({
     projects: snapshot.blocklist.projects,
     users: snapshot.blocklist.users,
     reveal: snapshot.reveal
   })
+  const state = snapshot.rulesState || rulesState()
+  for (const wc of siteContents()) {
+    const url = wc.getURL()
+    const wasWalled = !!pure.pageWallKey(prev, url)
+    const isWalled = !!pure.pageWallKey(currentRules, url)
+    injector.pushRules(wc, state).then((ok) => {
+      if (!ok || !wasWalled || isWalled || wc.isDestroyed()) return
+      // 从墙变成不墙：这个窗口的数据当初根本没取到，必须重新加载才算真放开
+      wc.reload()
+    })
+  }
 }
 
 function sessionFor(account) {
@@ -198,11 +210,6 @@ function windowsFor(account) {
   return list
 }
 
-function broadcastRules() {
-  const state = rulesState()
-  for (const wc of siteContents()) injector.pushRules(wc, state)
-}
-
 function registerIpc() {
   ipcMain.on('shield:intent', (event, msg) => handleIntent(event, msg))
 }
@@ -258,10 +265,9 @@ module.exports = {
   siteContents,
   liveSiteWindows,
   windowsFor,
-  broadcastRules,
+  applyRules,
   sessionFor,
   registry,
-  setRules,
   setQuitting,
   setContextMenuHandler,
   SITE

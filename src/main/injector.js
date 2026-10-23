@@ -64,7 +64,12 @@ function watchDomReady(wc, sess) {
   sess.watchingDomReady = true
   wc.on('dom-ready', async () => {
     if (wc.isDestroyed()) return
-    if (await hasEngine(wc)) return
+    if (await hasEngine(wc)) {
+      // document-start 那段脚本里烤进去的是注册当时的规则快照，重登记没赶上这次加载时
+      // 规则会是旧的；在 dom-ready 补一次下发，页面自己的请求还来得及走新规则
+      wc.executeJavaScript(updateCode(sess)).catch(() => {})
+      return
+    }
     log('dom-ready 兜底注入', sess.mode)
     wc.executeJavaScript(bootstrapCode(sess))
       .then(async () => {
@@ -132,13 +137,21 @@ function install(wc, state) {
 
 // 插件增删或开关之后，重新注册 document-start 脚本；已经在看的页面要重载才生效，
 // 这里不替用户刷新，免得把他正在编辑的译文草稿打断。
+function reregisterBootstrap(wc, sess) {
+  return withTimeout(
+    wc.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: sess.scriptId }),
+    2000,
+    'removeScriptToEvaluateOnNewDocument'
+  )
+    .catch(() => {})
+    .then(() => cdpInject(wc, sess))
+}
+
 function refreshPlugins(wc) {
   const sess = SESSIONS.get(wc)
   if (!sess || wc.isDestroyed()) return
   if (sess.mode === 'cdp' && sess.scriptId) {
-    wc.debugger.sendCommand('Page.removeScriptToEvaluateOnNewDocument', { identifier: sess.scriptId })
-      .then(() => cdpInject(wc, sess))
-      .catch((e) => console.log('[注入] 插件刷新失败', String(e && e.message ? e.message : e)))
+    reregisterBootstrap(wc, sess).catch((e) => console.log('[注入] 插件刷新失败', String(e && e.message ? e.message : e)))
   }
 }
 
@@ -148,11 +161,21 @@ function refreshPluginsAll() {
   }
 }
 
+// document-start 那段脚本是一次性注册的字符串，规则变了不重登记，重载就会带着旧规则启动：
+// 用户点「临时显示」后墙消失了、数据仍被旧规则挡着，看起来就像屏蔽解不掉。
+// 返回 Promise，调用方要在它 resolve 之后才能重载页面。
 function pushRules(wc, state) {
   const sess = SESSIONS.get(wc)
-  if (!sess || wc.isDestroyed()) return
+  if (!sess || wc.isDestroyed()) return Promise.resolve(false)
+  const changed = JSON.stringify(sess.state) !== JSON.stringify(state)
   sess.state = state
-  wc.executeJavaScript(updateCode(sess)).catch((e) => log('下发规则失败', String(e && e.message ? e.message : e)))
+  const redo = changed && sess.mode === 'cdp' && sess.scriptId && wc.debugger && wc.debugger.isAttached()
+    ? reregisterBootstrap(wc, sess)
+    : Promise.resolve()
+  return redo
+    .catch(() => {})
+    .then(() => wc.executeJavaScript(updateCode(sess)).then(() => true, () => true))
+    .catch(() => false)
 }
 
 // 首次导航前 CDP 目标还没建好会超时；等第一次加载完成后再试一次，

@@ -210,6 +210,17 @@ function urlTargetsBlockedProject(rules, href) {
   return 0
 }
 
+// 这个 URL 现在是不是一面墙（引擎里 currentPageHit 的同款判定）。
+// 主进程用它对比规则变更前后，找出「刚才被墙住、现在放开了」的窗口去重载。
+function pageWallKey(rules, href) {
+  const info = parseSiteUrl(href)
+  if (info.foreign) return ''
+  if (info.projectId !== null && projectBlocked(rules, info.projectId)) return 'project:' + info.projectId
+  if (info.userId !== null && rules.userIds.has(info.userId) &&
+    !rules.revealAll && !rules.revealUsers.has('id:' + info.userId)) return 'user:' + info.userId
+  return ''
+}
+
 // 开了「完全隐藏并自动标已读」之后，私信列表回到整行移除的处理；
 // 没开时保留行，让站点自己的 2 秒自动标已读能工作，未读角标才不会卡住
 function isUserRemoveScope(apiPath, rules) {
@@ -356,6 +367,7 @@ module.exports = {
   isUserRemoveScope,
   maskUserEntity,
   normalizeRules,
+  pageWallKey,
   parseSiteUrl,
   projectBlocked,
   urlTargetsBlockedProject,

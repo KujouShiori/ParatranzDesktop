@@ -41,8 +41,7 @@ function sendAll(channel, payload) {
 
 function registerManageIpc() {
   store.onChange((snap) => {
-    windows.setRules(snap)
-    windows.broadcastRules()
+    windows.applyRules(snap)
     sendAll('manage:changed', snap)
   })
 

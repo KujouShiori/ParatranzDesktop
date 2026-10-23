@@ -218,20 +218,34 @@ async function run() {
 
   await step('截图：屏蔽墙', () => shoot(wc, 'wall'))
 
-  await step('临时解除后内容恢复可见', async () => {
-    store.revealProject(victim.id)
-    await sleep(1200)
+  await step('临时解除后页面自己把内容取回来', async () => {
+    // 墙是本地判定，这个页面的数据当初就被硬屏蔽挡掉了。只下发新规则的话，
+    // 用户看到的是「墙消失了但内容还是空的」，等于解不开屏蔽——所以必须重载并检查渲染结果。
+    let reloads = 0
+    const onStart = () => { reloads++ }
+    wc.on('did-start-navigation', onStart)
     net.reset()
+    store.revealProject(victim.id)
+    const deadline = Date.now() + 20000
+    while (reloads === 0 && Date.now() < deadline) await sleep(100)
+    while (wc.isLoading() && Date.now() < deadline) await sleep(100)
+    wc.removeListener('did-start-navigation', onStart)
+    if (reloads === 0) throw new Error('解除屏蔽后窗口没有重新加载，页面数据仍然取不回来')
+    await sleep(3000)
     const r = await probe(wc, `
       const wall = document.querySelector('.pt-shield-wall');
-      const res = await fetch('/api/projects/${victim.id}');
-      const body = await res.json();
-      return { wall: !!wall, status: res.status, name: body.name };
+      return {
+        wall: !!wall,
+        nameShown: (document.body.innerText || '').indexOf(${JSON.stringify(String(victim.name || ''))}) >= 0,
+        visibleRows: [...document.querySelectorAll('table tbody tr, .project, .string')].filter((n) => n.getClientRects().length > 0).length,
+        revealed: window.__ptShieldInfo ? window.__ptShieldInfo().stats : null
+      };
     `)
-    if (r.wall) throw new Error('解除后屏蔽墙仍在')
-    if (r.status !== 200) throw new Error('解除后接口仍被拦，status=' + r.status)
-    if (!net.matching('/api/projects/' + victim.id).length) throw new Error('解除后没有真正发出请求')
-    return r
+    if (r.wall) throw new Error('解除后屏蔽墙仍在：' + JSON.stringify(r))
+    if (!r.nameShown) throw new Error('解除后页面上看不到项目名，内容没被重新取回来：' + JSON.stringify(r))
+    const own = net.matching('/api/projects/' + victim.id)
+    if (!own.length) throw new Error('页面自己没有重新请求该项目接口：' + JSON.stringify(r))
+    return { reloads: reloads, nameShown: r.nameShown, visibleRows: r.visibleRows, requests: own.length }
   })
 
   await step('翻译工作台页面能正常渲染', async () => {

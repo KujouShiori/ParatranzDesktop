@@ -10,6 +10,12 @@ function status(text, isError) {
   if (text) setTimeout(() => { if (el.textContent === text) el.textContent = '' }, 4000)
 }
 
+// 解除之后能立刻看到什么：被墙住的那个页面会自动重新加载把数据取回来；
+// 其它列表里早先被挡掉的条目要重新进入该页才会回来——不替用户刷新别的窗口，免得打断正在写的译文。
+function unblockHint() {
+  status('已解除；被墙住的那个页面会自动重新加载，其它列表里少掉的条目重新进入该页就会回来')
+}
+
 function time(v) {
   if (!v) return ''
   return new Date(v).toLocaleString('zh-CN', { hour12: false })
@@ -48,8 +54,8 @@ function renderProjects() {
     tr.appendChild(td(String(p.id)))
     tr.appendChild(td(time(p.addedAt)))
     const ops = td('ops')
-    ops.appendChild(button(isRevealed('project', p.id) ? '已临时显示' : '临时显示', 'ghost', () => api.revealProject(p.id).then(apply)))
-    ops.appendChild(button('删除', 'ghost', () => api.removeProject(p.id)))
+    ops.appendChild(button(isRevealed('project', p.id) ? '已临时显示' : '临时显示', 'ghost', () => api.revealProject(p.id).then(apply).then(unblockHint)))
+    ops.appendChild(button('删除', 'ghost', () => api.removeProject(p.id).then(unblockHint)))
     tr.appendChild(ops)
     tbody.appendChild(tr)
   }
@@ -68,8 +74,8 @@ function renderUsers() {
     tr.appendChild(td(String(u.id || '')))
     tr.appendChild(td(time(u.addedAt)))
     const ops = td('ops')
-    ops.appendChild(button(isRevealed('user', key) ? '已临时显示' : '临时显示', 'ghost', () => api.revealUser(key).then(apply)))
-    ops.appendChild(button('删除', 'ghost', () => api.removeUser(key)))
+    ops.appendChild(button(isRevealed('user', key) ? '已临时显示' : '临时显示', 'ghost', () => api.revealUser(key).then(apply).then(unblockHint)))
+    ops.appendChild(button('删除', 'ghost', () => api.removeUser(key).then(unblockHint)))
     tr.appendChild(ops)
     tbody.appendChild(tr)
   }
@@ -186,7 +192,7 @@ function renderLoginAccounts() {
 }
 
 function wire() {
-  $('revealAll').addEventListener('change', (e) => api.setRevealAll(e.target.checked).then(apply))
+  $('revealAll').addEventListener('change', (e) => api.setRevealAll(e.target.checked).then(apply).then(() => { if (e.target.checked) unblockHint() }))
   $('addProject').addEventListener('click', () => {
     const id = Number($('projectId').value.trim())
     if (!Number.isFinite(id) || id <= 0) return status('请输入数字项目 ID', true)

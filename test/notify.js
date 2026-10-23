@@ -139,5 +139,21 @@ check('内联 project 对象识别', shape.projectIdsOf({ project: { id: 12, nam
   check('同一会话的多条只标一次', shape.blockedUnreadConversations(sameConv, blockedSender, 1), [900001])
 }
 
+// 自己发出去的那条不该提醒自己
+{
+  const me = 1
+  const mine = { id: 700003, from: me, to: 900001, uid: me, content: '我发出去的一句', fromUser: { id: me, username: 'example-me' } }
+  const theirs = { id: 700001, from: 900001, to: me, uid: 900001, content: '别人发给我的一句', fromUser: { id: 900001, username: 'example-sender' } }
+  check('我发的私信认得出', shape.isSelfAuthored(mine, me), true)
+  check('别人发的私信不算我发的', shape.isSelfAuthored(theirs, me), false)
+  check('只有数字 from 没有 fromUser 的变体也认得出', shape.isSelfAuthored({ id: 1, from: me, to: 900001 }, me), true)
+  check('收信人是自己不算自己发的', shape.isSelfAuthored({ id: 2, from: 900001, to: me }, me), false)
+  check('认不出我是谁时一律提醒（宁多不漏）', shape.isSelfAuthored(mine, null), false)
+  check('账号 id 取不到为 0 时不误判', shape.isSelfAuthored({ id: 3, from: 0, to: 0 }, 0), false)
+  check('时间戳量级的 from 不会被当成我的 id', shape.isSelfAuthored({ from: 1730000000000 }, me), false)
+  const msg = { id: 800009, from: me, to: 900001, content: { text: '我触发的一条消息' } }
+  check('站内消息里我发起的同样不提醒', shape.isSelfAuthored(msg, me), true)
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

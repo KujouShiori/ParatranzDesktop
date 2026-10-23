@@ -249,5 +249,23 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('成员表行为不随开关变化', memberRow.length, fixture('projects_10709_members_page_1_pageSize_3.json').filter((m) => m.user.id !== 900001).length)
 }
 
+// 18. 页面级屏蔽命中判定：主进程靠它对比规则前后，决定哪个窗口要重载
+{
+  const blocked = rules({ projects: [{ id: 10709 }], users: [{ id: 42, username: 'spammer' }] })
+  const termUrl = 'https://paratranz.cn/projects/10709/terms'
+  check('被屏蔽项目页面是墙', P.pageWallKey(blocked, termUrl), 'project:10709')
+  check('其它页面不是墙', P.pageWallKey(blocked, 'https://paratranz.cn/projects'), '')
+  check('没屏蔽时同一路径不是墙', P.pageWallKey(rules({}), termUrl), '')
+  check('临时解除该项目后不再是墙', P.pageWallKey(rules({ projects: [{ id: 10709 }], reveal: { projectIds: [10709] } }), termUrl), '')
+  check('全局临时显示时不再是墙', P.pageWallKey(rules({ projects: [{ id: 10709 }], reveal: { all: true } }), termUrl), '')
+  check('解除另一个项目不影响这面墙', P.pageWallKey(rules({ projects: [{ id: 10709 }, { id: 10710 }], reveal: { projectIds: [10710] } }), termUrl), 'project:10709')
+  const userUrl = 'https://paratranz.cn/users/42'
+  check('被屏蔽用户主页是墙', P.pageWallKey(blocked, userUrl), 'user:42')
+  check('按用户名屏蔽不会在用户主页砌墙（墙只按 id 认）', P.pageWallKey(rules({ users: [{ username: 'spammer' }] }), userUrl), '')
+  check('临时解除该用户后不再是墙', P.pageWallKey(rules({ users: [{ id: 42 }], reveal: { userKeys: ['id:42'] } }), userUrl), '')
+  check('站外地址不参与判定', P.pageWallKey(blocked, 'https://evil.test/projects/10709'), '')
+  check('空地址不参与判定', P.pageWallKey(blocked, ''), '')
+}
+
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

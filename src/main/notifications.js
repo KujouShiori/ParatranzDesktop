@@ -158,12 +158,16 @@ async function pollFeed(account, feed, rules) {
     entry.primed = true
     return
   }
+  let myId
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const id = shape.keyOf(item, i)
     if (entry.seen.has(id)) continue
     entry.seen.add(id)
     if (shape.shouldSkip(item, rules)) continue
+    // 自己发出去的那条只是列表里多了个新条目，不是别人在找我
+    if (myId === undefined) myId = await myUidFor(account, ses)
+    if (shape.isSelfAuthored(item, myId)) continue
     notify(account, shape.titleOf(item, feed.id), shape.bodyOf(item))
   }
 }
