@@ -64,6 +64,7 @@ module.exports = function shieldEngine(config) {
   let routeTick = null
   let wallEl = null
   let fabEl = null
+  let staleEl = null
   const stats = { filtered: 0, droppedProjects: 0, droppedUsers: 0, maskedUsers: 0, hardBlocked: 0, domHidden: 0 }
 
   function buildRules(state) {
@@ -575,23 +576,52 @@ module.exports = function shieldEngine(config) {
   }
 
   // ---------- DOM ----------
-  function itemOf(anchor) {
+  function isItemContainer(el) {
+    if (!el || !el.matches) return false
     for (const sel of ITEM_CONTAINERS) {
-      if (anchor.closest) {
-        const hit = anchor.closest(sel)
-        if (hit) return hit
+      try {
+        if (el.matches(sel)) return true
+      } catch (e) {}
+    }
+    return false
+  }
+
+  // 容器里出现了几个「同类」对象。等于 1 说明它就是这个对象的行；
+  // 大于 1 说明再往上是列表本身，整块藏掉就会连别人的行一起消失。
+  function sameKindTargets(el, kind) {
+    const sel = kind === 'project' ? 'a[href*="/projects/"]' : 'a[href*="/users/"]'
+    const seen = {}
+    let n = 0
+    for (const a of queryAll(el, sel)) {
+      const href = a.getAttribute && a.getAttribute('href')
+      const info = href ? parseSiteUrl(href) : null
+      const id = info ? (kind === 'project' ? info.projectId : info.userId) : null
+      if (id === null || id === undefined) continue
+      if (!seen[id]) {
+        seen[id] = 1
+        n++
       }
     }
+    return n
+  }
+
+  // 从锚点往上找「该行」：取仍然只装着这一个对象的最新一层容器。
+  // 早先按选择器顺序取第一个 closest 命中，成员页上 .project 先命中，
+  // 结果把 div.project.container 整个藏掉——屏蔽一个人等于清空整页。
+  function itemOf(anchor, kind) {
+    let inner = null
+    let best = null
     let node = anchor
     let hops = 0
-    while (node && node !== d.body && hops < 6) {
-      const parent = node.parentElement
-      if (!parent) return node
-      if (parent.children && parent.children.length > 1) return node
-      node = parent
+    while (node && node !== d.body && hops < 12) {
+      if (isItemContainer(node)) {
+        if (!inner) inner = node
+        if (sameKindTargets(node, kind) === 1) best = node
+      }
+      node = node.parentElement
       hops++
     }
-    return node
+    return best || inner || anchor
   }
 
   function hideItem(el, kind) {
@@ -615,15 +645,15 @@ module.exports = function shieldEngine(config) {
         const href = el.getAttribute('href')
         if (!href) continue
         const info = parseSiteUrl(href)
-        const item = itemOf(el)
-        if (info.projectId !== null && projectBlocked(info.projectId)) hideItem(item, 'project')
-        else if (info.userId !== null && rules.userIds.has(info.userId) &&
-          !rules.revealAll && !rules.revealUsers.has('id:' + info.userId)) hideItem(item, 'user')
+        const kind = info.projectId !== null && projectBlocked(info.projectId) ? 'project'
+          : info.userId !== null && userBlockedById(info.userId) ? 'user' : null
+        if (kind) hideItem(itemOf(el, kind), kind)
       }
     }
     if (rules.userNames.size) {
       for (const el of queryAll(root, '[alt]')) {
-        if (userNameBlocked(el.getAttribute('alt'))) el.style.visibility = 'hidden'
+        // 用和别处同一个标记藏，别写内联 style：内联样式解除屏蔽时没人还原
+        if (userNameBlocked(el.getAttribute('alt'))) hideItem(itemOf(el, 'user'), 'user')
       }
     }
   }
@@ -638,7 +668,12 @@ module.exports = function shieldEngine(config) {
     ' background:#161616; color:#eee; display:flex; align-items:center; justify-content:center;',
     ' text-align:center; font-size:15px; }',
     '.pt-shield-wall > div { max-width: 30rem; line-height: 2; }',
-    '.pt-shield-wall button { margin: 0 6px; padding: 6px 16px; cursor: pointer; }'
+    '.pt-shield-wall button { margin: 0 6px; padding: 6px 16px; cursor: pointer; }',
+    '.pt-stale-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 2147483000;',
+    ' background:#1f1f1f; color:#fff; border:1px solid #555; border-radius:6px; padding:8px 12px;',
+    ' font-size:13px; box-shadow:0 2px 10px rgba(0,0,0,.4); display:flex; gap:10px; align-items:center;',
+    ' max-width: 90vw; }',
+    '.pt-stale-bar button { padding:4px 10px; cursor:pointer; }'
   ].join('\n')
 
   function injectStyle() {
@@ -825,10 +860,70 @@ module.exports = function shieldEngine(config) {
     return value
   }
 
+  // ---------- 解除屏蔽之后 ----------
+  // 屏蔽发生在数据交给页面之前：整行被拿掉、名字被换掉、正文被改成占位文本。
+  // 解除之后页面手里仍然是那份改写过的数据，不重新取一次就永远看不到原样。
+  function effectiveBlockedCount(r) {
+    if (r.revealAll) return 0
+    let n = 0
+    r.projectIds.forEach(function (id) { if (!r.revealProjects.has(Number(id))) n++ })
+    r.userIds.forEach(function (id) { if (!r.revealUsers.has('id:' + id)) n++ })
+    r.userNames.forEach(function (nm) { if (!r.revealUsers.has('name:' + nm)) n++ })
+    return n
+  }
+
+  function staleOnScreen() {
+    if (stats.droppedUsers > 0 || stats.droppedProjects > 0 || stats.maskedUsers > 0) return true
+    const t = d.body && d.body.innerText
+    return !!(t && (t.indexOf(MASK_TEXT) >= 0 || t.indexOf(HIDDEN_BODY) >= 0))
+  }
+
+  // 译文框、评论框、私信框里只要有没发出去的字，就不替他刷新这一页
+  function hasPendingInput() {
+    const nodes = queryAll(d, 'textarea, input[type=text], input:not([type]), [contenteditable="true"]')
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i]
+      const v = typeof n.value === 'string' ? n.value : (n.textContent || '')
+      if (String(v).trim()) return true
+    }
+    return false
+  }
+
+  function removeStaleBar() {
+    if (staleEl && staleEl.parentNode) staleEl.parentNode.removeChild(staleEl)
+    staleEl = null
+  }
+
+  function showStaleBar() {
+    if (staleEl) return
+    staleEl = d.createElement('div')
+    staleEl.className = 'pt-stale-bar'
+    const text = d.createElement('span')
+    text.textContent = '屏蔽已解除，这一页上的内容还是屏蔽时取到的'
+    const reload = d.createElement('button')
+    reload.textContent = '重新加载这一页'
+    reload.addEventListener('click', function (ev) {
+      if (ev && ev.isTrusted === false) return
+      w.location.reload()
+    }, true)
+    const later = d.createElement('button')
+    later.textContent = '先不刷'
+    later.addEventListener('click', function (ev) {
+      if (ev && ev.isTrusted === false) return
+      removeStaleBar()
+    }, true)
+    staleEl.appendChild(text)
+    staleEl.appendChild(reload)
+    staleEl.appendChild(later)
+    ;(d.body || d.documentElement).appendChild(staleEl)
+  }
+
   // 名单更新只能走这条句柄：token 只存在于参数和闭包里，不会出现在页面能监听的任何消息里。
   function applyRules(state, token) {
     if (config.token && token !== config.token) return false
+    const prev = rules
     rules = buildRules(state)
+    const loosened = effectiveBlockedCount(prev) > effectiveBlockedCount(rules)
     if (observer) {
       observer.disconnect()
       observer = null
@@ -838,6 +933,12 @@ module.exports = function shieldEngine(config) {
     purgeCaches()
     installObserver()
     checkRoute()
+    if (loosened && staleOnScreen()) {
+      if (hasPendingInput()) showStaleBar()
+      else w.location.reload()
+    } else {
+      removeStaleBar()
+    }
     return true
   }
 

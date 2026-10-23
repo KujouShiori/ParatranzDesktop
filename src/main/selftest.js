@@ -366,6 +366,86 @@ async function run() {
     }
   })
 
+  await step('屏蔽一个成员不该清空整页，解除后内容自己回来', async () => {
+    if (!victim) throw new Error('没有可用的项目靶子')
+    const res = await ses.fetch('https://paratranz.cn/api/projects/' + victim.id + '/members?page=1&pageSize=20', { headers: { accept: 'application/json' } })
+    const json = await res.json()
+    const rows = Array.isArray(json) ? json : (json && json.results) || []
+    const target = rows.map((r) => r.user).find((u) => u && Number.isFinite(Number(u.id)))
+    if (!target) return { skipped: '该项目没有可屏蔽的成员（未登录看不到成员）' }
+
+    const countLinks = `return (() => {
+      const vis = (n) => n.getClientRects().length > 0;
+      const links = [...document.querySelectorAll('.user-link')].filter(vis);
+      return { links: links.length, names: links.map((n) => (n.innerText || '').replace(/\\s+/g, ' ').trim()) };
+    })()`
+
+    wc.loadURL('https://paratranz.cn/projects/' + victim.id + '/members')
+    await waitFinishLoad(wc)
+    await sleep(3500)
+    const clean = await probe(wc, countLinks)
+    if (clean.links < 2) throw new Error('成员页可见链接太少，无法判断：' + JSON.stringify(clean))
+
+    store.addUser({ id: target.id, username: target.username })
+    await sleep(1500)
+    const blocked = await probe(wc, countLinks)
+    const gone = clean.links - blocked.links
+    if (blocked.links <= clean.links / 2 || gone > 3) {
+      throw new Error('屏蔽一个成员却清掉了大片列表：' + JSON.stringify({ before: clean.links, after: blocked.links, target: target.username }))
+    }
+    if (blocked.names.some((n) => n.indexOf(String(target.username)) >= 0)) throw new Error('被屏蔽成员仍然列在页面上')
+
+    let navs = 0
+    const onNav = (e, url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) navs++ }
+    wc.on('did-start-navigation', onNav)
+    store.removeUser(target.id)
+    await sleep(2500)
+    await new Promise((resolve) => {
+      const t = setTimeout(resolve, 15000)
+      wc.once('did-finish-load', () => { clearTimeout(t); resolve() })
+    })
+    await sleep(2500)
+    wc.removeListener('did-start-navigation', onNav)
+    const back = await probe(wc, countLinks)
+    if (!back.names.some((n) => n.indexOf(String(target.username)) >= 0)) {
+      throw new Error('解除屏蔽后该成员没有回来（链接 ' + blocked.links + ' → ' + back.links + '，自动重载 ' + navs + ' 次）：' + JSON.stringify(back))
+    }
+
+    // 更难的一路：带着屏蔽状态进页面，那一行在接口层就被拿掉了，
+    // 页面上没有任何标记可以还原，只能靠解除后重新取一次
+    store.addUser({ id: target.id, username: target.username })
+    await sleep(600)
+    wc.loadURL('https://paratranz.cn/projects/' + victim.id + '/members')
+    await waitFinishLoad(wc)
+    await sleep(3500)
+    const entered = await probe(wc, countLinks)
+    if (entered.names.some((n) => n.indexOf(String(target.username)) >= 0)) throw new Error('带着屏蔽进页面，那一行却还在：' + JSON.stringify(entered.names.slice(0, 5)))
+    let navs2 = 0
+    const onNav2 = (e, url, isInPlace, isMainFrame) => { if (isMainFrame && !isInPlace) navs2++ }
+    wc.on('did-start-navigation', onNav2)
+    store.removeUser(target.id)
+    await sleep(2500)
+    await new Promise((resolve) => {
+      const t = setTimeout(resolve, 15000)
+      wc.once('did-finish-load', () => { clearTimeout(t); resolve() })
+    })
+    await sleep(2500)
+    wc.removeListener('did-start-navigation', onNav2)
+    const refetched = await probe(wc, countLinks)
+    if (!refetched.names.some((n) => n.indexOf(String(target.username)) >= 0)) {
+      throw new Error('接口层被拿掉的行在解除屏蔽后没有重新取回来（自动重载 ' + navs2 + ' 次）：' + JSON.stringify(refetched))
+    }
+    return {
+      before: clean.links,
+      blocked: blocked.links,
+      after: back.links,
+      enteredBlocked: entered.links,
+      afterRefetch: refetched.links,
+      reloaded: navs + navs2,
+      target: target.username
+    }
+  })
+
   await step('多账号窗口各自独立且共享名单', async () => {
     store.upsertAccount({ id: 'acct-selftest', name: '自检账号二' })
     store.addProject({ id: 999998, name: '自检用假项目' })
