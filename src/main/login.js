@@ -21,11 +21,13 @@ async function loginWithToken(account, token) {
     return { ok: false, error: 'Token 应该是 32 位字母数字，检查一下有没有漏掉或多了空格' }
   }
   const ses = windows.sessionFor(account)
-  let res
+  // 站点用 302 表达成败，但这版 Electron 的 fetch 在 redirect:'manual' 下不会给你
+  // 那个 Location 头，而是直接抛「Redirect was cancelled」。所以跟着跳，
+  // 成败交给下面的「我是谁」判定——真正要紧的是会话里有没有种下 sid。
   try {
-    res = await ses.fetch(TOKEN_URL, {
+    await ses.fetch(TOKEN_URL, {
       method: 'POST',
-      redirect: 'manual',
+      redirect: 'follow',
       headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'text/html' },
       body: 'token=' + encodeURIComponent(value)
     })
@@ -33,17 +35,13 @@ async function loginWithToken(account, token) {
     return { ok: false, error: '请求失败：' + String(e && e.message ? e.message : e) }
   }
 
-  const location = res.headers.get('location') || ''
-  if (/fail=1/.test(location)) {
-    const msg = decodeURIComponent((/[?&]message=([^&]*)/.exec(location) || ['', ''])[1].replace(/\+/g, ' '))
-    return { ok: false, error: '站点拒绝了这个 Token' + (msg ? '：' + msg : '') }
-  }
-
   // 换 cookie 成功与否不能只看返回码，直接问一次「我是谁」
   try {
     const me = await ses.fetch(ACCOUNT_PROBE, { headers: { accept: 'application/json' } })
     const text = (await me.text()).trim()
-    if (!text) return { ok: false, error: 'Token 被接受了，但登录状态没有建立（会话里仍然是未登录）' }
+    if (!text) {
+      return { ok: false, error: '站点没有接受这枚 Token（会话里仍然是未登录）。去个人中心重新生成一枚再试' }
+    }
     const user = JSON.parse(text)
     if (!user || !user.username) return { ok: false, error: '登录状态校验失败：账号接口返回里没有用户名' }
     return { ok: true, username: user.username, nickname: user.nickname || user.username, account: account }

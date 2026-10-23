@@ -872,12 +872,6 @@ module.exports = function shieldEngine(config) {
     return n
   }
 
-  function staleOnScreen() {
-    if (stats.droppedUsers > 0 || stats.droppedProjects > 0 || stats.maskedUsers > 0) return true
-    const t = d.body && d.body.innerText
-    return !!(t && (t.indexOf(MASK_TEXT) >= 0 || t.indexOf(HIDDEN_BODY) >= 0))
-  }
-
   // 译文框、评论框、私信框里只要有没发出去的字，就不替他刷新这一页
   function hasPendingInput() {
     const nodes = queryAll(d, 'textarea, input[type=text], input:not([type]), [contenteditable="true"]')
@@ -933,7 +927,9 @@ module.exports = function shieldEngine(config) {
     purgeCaches()
     installObserver()
     checkRoute()
-    if (loosened && staleOnScreen()) {
+    if (loosened) {
+      // 不要求「这一页确实被改写过的证据」：走 dom-ready 兜底注入时，首屏的请求可能赶在
+      // 接管之前发出去，统计里就没有痕迹，但那正是用户觉得「解开了却什么都没回来」的时候
       if (hasPendingInput()) showStaleBar()
       else w.location.reload()
     } else {
