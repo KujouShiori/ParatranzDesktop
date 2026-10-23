@@ -133,6 +133,14 @@ check('foreign url ignored', P.parseSiteUrl('https://evil.test/projects/10709'),
 check('foreign url cannot hard block', P.urlTargetsBlockedProject(rules({ projects: [{ id: 10709 }] }), 'https://evil.test/projects/10709'), 0)
 check('static subdomain is not site routing', P.parseSiteUrl('https://static.paratranz.cn/media/x.png').foreign, false)
 
+// 10b. 「当前页面是什么可屏蔽对象」：菜单、页面右下角按钮、屏蔽管理按钮共用
+check('项目页认出项目', P.targetOfUrl('https://paratranz.cn/projects/20374/terms'), { kind: 'project', id: 20374 })
+check('用户页认出用户', P.targetOfUrl('https://paratranz.cn/users/42'), { kind: 'user', id: 42 })
+check('列表页没有可屏蔽对象', P.targetOfUrl('https://paratranz.cn/projects'), null)
+check('首页没有可屏蔽对象', P.targetOfUrl('https://paratranz.cn/'), null)
+check('站外地址不认', P.targetOfUrl('https://evil.test/projects/20374'), null)
+check('接口地址不算页面', P.targetOfUrl('https://paratranz.cn/api/projects/20374'), null)
+
 // 11. 真实形状回归：文件行不是项目，文件 id 与被屏蔽项目 id 撞车时不能误删
 {
   const files = fixture('files_list.json')
@@ -266,6 +274,12 @@ check('static subdomain is not site routing', P.parseSiteUrl('https://static.par
   check('站外地址不参与判定', P.pageWallKey(blocked, 'https://evil.test/projects/10709'), '')
   check('空地址不参与判定', P.pageWallKey(blocked, ''), '')
 }
+
+// 19. 右下角屏蔽按钮的开关要能穿过「序列化下发给页面」这一程
+check('默认显示右下角按钮', rules({}).showPageFab, true)
+check('显式关掉才不显示', rules({ showPageFab: false }).showPageFab, false)
+check('下发状态默认为真', P.buildRulesState(rules({})).showPageFab, true)
+check('关掉后下发状态也是假', P.buildRulesState(rules({ showPageFab: false })).showPageFab, false)
 
 console.log((failed ? 'FAILED ' : 'ok ') + passed + ' passed, ' + failed + ' failed')
 process.exit(failed ? 1 : 0)

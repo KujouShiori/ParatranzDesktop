@@ -113,6 +113,7 @@ function renderSettings() {
   $('notifyOn').checked = s.notifications !== false
   $('notifyInterval').value = String(s.notifyIntervalSec || 45)
   $('closeToTray').checked = s.closeToTray !== false
+  $('fabOn').checked = s.showPageFab !== false
   $('autoClearMail').checked = s.autoClearBlockedMail === true
   $('dumpShapes').checked = !!s.dumpShapes
 }
@@ -145,6 +146,35 @@ function refreshPluginHint() {
   $('pluginHint').textContent = '插件文件夹里的改动要重载窗口才生效'
 }
 
+function accountLabel(account) {
+  if (!account || account === 'default') return '默认窗口'
+  const a = ((snap && snap.accounts) || []).find((x) => x.id === account)
+  return (a && a.name) || account
+}
+
+// 站点标题形如「术语 - 某项目 - ParaTranz」，提示里不需要那个尾巴
+function pageTitleOf(t) {
+  const stripped = String(t.title || '').replace(/\s*[-–]\s*ParaTranz\s*$/i, '').trim()
+  return stripped || t.url
+}
+
+function renderTarget() {
+  const btn = $('blockCurrent')
+  const hint = $('blockCurrentHint')
+  if (!btn || !hint) return Promise.resolve()
+  return api.currentTarget().then((t) => {
+    if (!t) {
+      btn.disabled = true
+      btn.textContent = '屏蔽当前页面'
+      hint.textContent = '站点窗口当前不在项目页或用户页上'
+      return
+    }
+    btn.disabled = false
+    btn.textContent = (t.kind === 'project' ? '屏蔽本项目 ' : '屏蔽此用户 ') + t.id
+    hint.textContent = accountLabel(t.account) + '：' + pageTitleOf(t)
+  })
+}
+
 function apply(next) {
   if (next) snap = next
   renderProjects()
@@ -153,6 +183,7 @@ function apply(next) {
   renderSettings()
   renderLoginAccounts()
   renderPlugins()
+  renderTarget()
 }
 
 function td(text, cls) {
@@ -192,6 +223,9 @@ function renderLoginAccounts() {
 }
 
 function wire() {
+  $('blockCurrent').addEventListener('click', () => api.blockCurrent().then(apply).then(renderTarget))
+  // 他是先在站点窗口翻到那一页、再切回这个窗口的，所以聚焦时重新读一次当前页面
+  window.addEventListener('focus', renderTarget)
   $('revealAll').addEventListener('change', (e) => api.setRevealAll(e.target.checked).then(apply).then(() => { if (e.target.checked) unblockHint() }))
   $('addProject').addEventListener('click', () => {
     const id = Number($('projectId').value.trim())
@@ -222,6 +256,7 @@ function wire() {
   $('notifyOn').addEventListener('change', (e) => api.setSettings({ notifications: e.target.checked }))
   $('notifyInterval').addEventListener('change', (e) => api.setSettings({ notifyIntervalSec: Number(e.target.value) }))
   $('closeToTray').addEventListener('change', (e) => api.setSettings({ closeToTray: e.target.checked }))
+  $('fabOn').addEventListener('change', (e) => api.setSettings({ showPageFab: e.target.checked }))
   $('autoClearMail').addEventListener('change', (e) => {
     if (e.target.checked && !confirm('开启后，客户端会调用站点接口把被屏蔽者的会话标记为已读。这会改动服务器上的已读状态，且不可撤销。确认开启？')) {
       e.target.checked = false

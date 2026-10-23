@@ -57,6 +57,14 @@ function registerManageIpc() {
   ipcMain.handle('manage:reveal-all', (e, on) => { store.setRevealAll(on); return store.snapshot() })
   ipcMain.handle('manage:settings', (e, patch) => { store.updateSettings(patch); return store.snapshot() })
 
+  // 「屏蔽当前页面」和菜单里那条命令是同一条路径；对话框挂在屏蔽管理上，
+  // 不然确认框弹在用户没在看的那个窗口上。menu 反向依赖 manage，这里延迟引入。
+  ipcMain.handle('manage:current-target', () => require('./menu').currentPageTarget())
+  ipcMain.handle('manage:block-current', (e) => {
+    require('./menu').blockCurrentPage(BrowserWindow.fromWebContents(e.sender))
+    return store.snapshot()
+  })
+
   ipcMain.handle('manage:open-site', (e, opts) => {
     windows.createSiteWindow(opts || {})
     return { ok: true }

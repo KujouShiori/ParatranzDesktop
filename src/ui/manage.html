@@ -15,6 +15,15 @@
   </header>
 
   <section>
+    <h2>从当前页面屏蔽</h2>
+    <div class="add-row">
+      <button id="blockCurrent" disabled>屏蔽当前页面</button>
+      <span class="hint" id="blockCurrentHint">正在读取站点窗口…</span>
+    </div>
+    <p class="hint">和页面右下角那个按钮是同一件事，只是搬到这个窗口里来；点下去同样会弹一次确认。</p>
+  </section>
+
+  <section>
     <h2>屏蔽的项目</h2>
     <div class="add-row">
       <input type="text" id="projectId" placeholder="项目 ID，例如 10709">
@@ -91,6 +100,8 @@
       </select>
     </label>
     <label><input type="checkbox" id="closeToTray"> 关闭主窗口时留在托盘</label>
+    <label><input type="checkbox" id="fabOn"> 在项目页 / 用户页右下角显示「屏蔽本项目 / 屏蔽此用户」按钮</label>
+    <p class="hint">默认显示。嫌它压住正文就关掉，屏蔽照旧可以从本页右键、菜单里的「屏蔽当前项目 / 当前用户」，或者上面那个「从当前页面屏蔽」按钮发起。</p>
     <label><input type="checkbox" id="autoClearMail"> 被屏蔽者的私信完全隐藏，并自动标为已读</label>
     <p class="hint">默认关闭。开启后私信列表里被屏蔽者的行会整条消失，客户端同时调用站点自己的接口把与该人的会话标记已读（效果等同于你在网页上点开那条会话）——这会改动服务器上的已读状态，且不可撤销。关闭时保留该行、只显示「已屏蔽用户」与「内容已隐藏」，未读由站点自身机制清除。</p>
     <label><input type="checkbox" id="dumpShapes"> 记录接口原始结构（调试用，写入设置目录 shape-dump）</label>

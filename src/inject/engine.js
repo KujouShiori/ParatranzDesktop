@@ -74,7 +74,8 @@ module.exports = function shieldEngine(config) {
       revealProjects: new Set((state && state.revealProjectIds) || []),
       revealUsers: new Set((state && state.revealUserKeys) || []),
       revealAll: !!(state && state.revealAll),
-      clearBlockedMail: !!(state && state.clearBlockedMail)
+      clearBlockedMail: !!(state && state.clearBlockedMail),
+      showPageFab: !(state && state.showPageFab === false)
     }
     r.empty = !r.projectIds.size && !r.userIds.size && !r.userNames.size
     return r
@@ -703,8 +704,10 @@ module.exports = function shieldEngine(config) {
     if (MODE === 'filter-only' || !d.body) return
     const info = parseSiteUrl(w.location.href)
     let target = null
-    if (info.projectId !== null && !projectBlocked(info.projectId)) target = { kind: 'project', id: info.projectId }
-    else if (info.userId !== null) target = { kind: 'user', id: info.userId }
+    if (rules.showPageFab) {
+      if (info.projectId !== null && !projectBlocked(info.projectId)) target = { kind: 'project', id: info.projectId }
+      else if (info.userId !== null) target = { kind: 'user', id: info.userId }
+    }
     const wanted = target ? target.kind + ':' + target.id : ''
     if (fabEl && fabEl.getAttribute('data-target') !== wanted) {
       if (fabEl.parentNode) fabEl.parentNode.removeChild(fabEl)
@@ -856,6 +859,7 @@ module.exports = function shieldEngine(config) {
         projects: Array.from(rules.projectIds),
         users: Array.from(rules.userIds),
         revealAll: rules.revealAll,
+        showPageFab: rules.showPageFab,
         stats: stats
       }
     }

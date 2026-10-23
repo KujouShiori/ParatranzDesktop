@@ -317,9 +317,14 @@ async function run() {
             hasDumpSwitch: !!document.getElementById('dumpShapes'),
             hasAutoClearSwitch: !!document.getElementById('autoClearMail'),
             autoClearOffByDefault: !!document.getElementById('autoClearMail') && document.getElementById('autoClearMail').checked === false,
+            hasFabSwitch: !!document.getElementById('fabOn'),
+            fabOnByDefault: !!document.getElementById('fabOn') && document.getElementById('fabOn').checked === true,
             projectRows: rows,
             userRows: document.querySelectorAll('#userTable tbody tr').length,
-            accounts: document.querySelectorAll('#accountList li').length
+            accounts: document.querySelectorAll('#accountList li').length,
+            blockCurrentLabel: (document.getElementById('blockCurrent') || {}).textContent || '',
+            blockCurrentDisabled: !!(document.getElementById('blockCurrent') || {}).disabled,
+            blockCurrentHint: (document.getElementById('blockCurrentHint') || {}).textContent || ''
           };
         })()
       `)
@@ -328,10 +333,33 @@ async function run() {
       if (!r.hasRevealSwitch || !r.hasDumpSwitch) throw new Error('设置开关没渲染出来：' + JSON.stringify(r))
       if (!r.hasAutoClearSwitch) throw new Error('「自动标已读」开关没渲染出来：' + JSON.stringify(r))
       if (!r.autoClearOffByDefault) throw new Error('「自动标已读」应当默认关闭')
+      if (!r.hasFabSwitch) throw new Error('「右下角屏蔽按钮」开关没渲染出来：' + JSON.stringify(r))
+      if (!r.fabOnByDefault) throw new Error('「右下角屏蔽按钮」应当默认显示')
       if (!fake) throw new Error('新加入的项目没有出现在管理窗口里：' + JSON.stringify(r))
       if (!/临时显示/.test(fake) || !/删除/.test(fake)) throw new Error('行内操作按钮缺失：' + fake)
+      // 站点窗口此刻正停在被屏蔽靶子的术语页上，按钮就该认出那个项目
+      if (r.blockCurrentDisabled || !new RegExp('屏蔽本项目 ' + victim.id + '$').test(r.blockCurrentLabel.trim())) {
+        throw new Error('「屏蔽当前页面」没认出站点窗口的项目：' + JSON.stringify({ label: r.blockCurrentLabel, disabled: r.blockCurrentDisabled, hint: r.blockCurrentHint }))
+      }
+      // 开关要当场生效：关掉之后页面上那个悬浮按钮必须消失，再打开要回来
+      const fabProbe = `return ({
+        fab: !!document.querySelector('.pt-shield-fab'),
+        info: window.__ptShieldInfo ? window.__ptShieldInfo() : null,
+        children: [...document.body.children].map((e) => e.className || e.tagName).slice(0, 10),
+        url: location.href
+      })`
+      const fabBefore = await probe(wc, fabProbe)
+      store.updateSettings({ showPageFab: false })
+      await sleep(700)
+      const fabOff = await probe(wc, fabProbe)
+      store.updateSettings({ showPageFab: true })
+      await sleep(700)
+      const fabBack = await probe(wc, fabProbe)
+      if (!fabBefore.fab) throw new Error('默认状态下页面右下角没有屏蔽按钮：' + JSON.stringify(fabBefore))
+      if (fabOff.fab) throw new Error('关掉开关后右下角按钮仍然存在：' + JSON.stringify(fabOff))
+      if (!fabBack.fab) throw new Error('重新打开开关后右下角按钮没有回来：' + JSON.stringify(fabBack))
       if (errs.length) throw new Error('管理窗口有报错：' + errs.slice(0, 3).join(' | '))
-      return { rows: r.projectRows.length, userRows: r.userRows, accounts: r.accounts }
+      return { rows: r.projectRows.length, userRows: r.userRows, accounts: r.accounts, blockCurrent: r.blockCurrentLabel, fab: { before: fabBefore.fab, off: fabOff.fab, back: fabBack.fab } }
     } finally {
       store.removeProject(999999)
       mw.close()

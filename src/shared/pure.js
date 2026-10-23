@@ -84,6 +84,8 @@ function normalizeRules(raw) {
   for (const key of reveal.userKeys || []) rules.revealUsers.add(String(key))
   rules.revealAll = !!reveal.all
   rules.clearBlockedMail = !!(raw && raw.clearBlockedMail)
+  // 页面右下角那个快捷屏蔽按钮，默认显示；只有显式关掉才不画
+  rules.showPageFab = !(raw && raw.showPageFab === false)
   return rules
 }
 
@@ -221,6 +223,16 @@ function pageWallKey(rules, href) {
   return ''
 }
 
+// 这个 URL 指向的是哪个可屏蔽对象。菜单、页面右下角的按钮、屏蔽管理里的按钮
+// 都问同一个问题，别在三个地方各解析一遍。
+function targetOfUrl(href) {
+  const info = parseSiteUrl(href)
+  if (info.foreign || info.apiPath) return null
+  if (info.projectId !== null) return { kind: 'project', id: info.projectId }
+  if (info.userId !== null) return { kind: 'user', id: info.userId }
+  return null
+}
+
 // 开了「完全隐藏并自动标已读」之后，私信列表回到整行移除的处理；
 // 没开时保留行，让站点自己的 2 秒自动标已读能工作，未读角标才不会卡住
 function isUserRemoveScope(apiPath, rules) {
@@ -345,6 +357,7 @@ function buildRulesState(rules) {
     userNames: Array.from(rules.userNames),
     revealAll: rules.revealAll,
     clearBlockedMail: !!rules.clearBlockedMail,
+    showPageFab: rules.showPageFab !== false,
     revealProjectIds: Array.from(rules.revealProjects),
     revealUserKeys: Array.from(rules.revealUsers)
   }
@@ -370,6 +383,7 @@ module.exports = {
   pageWallKey,
   parseSiteUrl,
   projectBlocked,
+  targetOfUrl,
   urlTargetsBlockedProject,
   userEntityBlocked,
   userKeyOf,

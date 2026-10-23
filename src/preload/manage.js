@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('ptManage', {
   removeUser: (key) => call('manage:remove-user', key),
   revealProject: (id) => call('manage:reveal-project', id),
   revealUser: (key) => call('manage:reveal-user', key),
+  currentTarget: () => call('manage:current-target'),
+  blockCurrent: () => call('manage:block-current'),
   setRevealAll: (on) => call('manage:reveal-all', !!on),
   setSettings: (patch) => call('manage:settings', patch),
   openSite: (opts) => call('manage:open-site', opts),

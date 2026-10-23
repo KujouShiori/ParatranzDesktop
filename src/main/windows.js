@@ -202,6 +202,21 @@ function liveSiteWindows() {
   return out
 }
 
+// 用户说的「当前页面」是哪个窗口：站点窗口自己有焦点时就是它；焦点在屏蔽管理这类
+// 辅助窗口上时，用最近聚焦过的那个账号的窗口；都不行才退回第一个站点窗口。
+function activeSiteWindow() {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && !focused.isDestroyed()) {
+    const entry = registry.get(focused.webContents.id)
+    if (entry && entry.kind === 'site') return focused
+  }
+  for (const entry of registry.values()) {
+    if (entry && entry.kind === 'site' && entry.account === focusedAccount && entry.win && !entry.win.isDestroyed()) return entry.win
+  }
+  const list = siteContents()
+  return list.length ? list[0].getBrowserWindow() : null
+}
+
 function windowsFor(account) {
   const list = []
   for (const entry of registry.values()) {
@@ -265,6 +280,7 @@ module.exports = {
   siteContents,
   liveSiteWindows,
   windowsFor,
+  activeSiteWindow,
   applyRules,
   sessionFor,
   registry,

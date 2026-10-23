@@ -1,7 +1,7 @@
 {
   "name": "paratranz-desktop",
   "productName": "Paratranz Desktop",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "paratranz.cn 桌面客户端：完整翻译工作台 + 项目/用户屏蔽层",
   "private": true,
   "main": "src/main/index.js",

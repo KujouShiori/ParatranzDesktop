@@ -8,43 +8,61 @@ const pure = require('../shared/pure')
 
 let revealMenuItem = null
 
-function activeSiteWindow() {
-  const win = require('electron').BrowserWindow.getFocusedWindow()
-  if (win && windows.registry.has(win.webContents.id)) return win
-  const list = windows.siteContents()
-  if (!list.length) return null
-  return list[0].getBrowserWindow()
+function accountLabel(account) {
+  if (!account || account === 'default') return '默认窗口'
+  const a = (store.snapshot().accounts || []).find((x) => x.id === account)
+  return a ? a.name : account
+}
+
+// 屏蔽管理窗口要按这个结果决定按钮上写什么；它只读，不改任何东西。
+function currentPageTarget() {
+  const win = windows.activeSiteWindow()
+  if (!win) return null
+  const hit = pure.targetOfUrl(win.webContents.getURL())
+  if (!hit) return null
+  const entry = windows.registry.get(win.webContents.id)
+  return {
+    kind: hit.kind,
+    id: hit.id,
+    title: win.getTitle(),
+    url: win.webContents.getURL(),
+    account: entry ? entry.account : 'default'
+  }
+}
+
+// hostWin：对话框挂在哪个窗口上。从屏蔽管理里点就挂过去，
+// 否则弹在用户没在看的那个窗口上，像是点错了地方。
+function blockCurrentPage(hostWin) {
+  const site = windows.activeSiteWindow()
+  const target = currentPageTarget()
+  if (!target) {
+    dialog.showMessageBoxSync(hostWin || site || undefined, {
+      type: 'info',
+      message: site ? '站点窗口当前不在项目页或用户页上，没有可屏蔽的对象。' : '还没有打开的站点窗口。'
+    })
+    return null
+  }
+  const choice = dialog.showMessageBoxSync(hostWin || site, {
+    type: 'question',
+    buttons: ['屏蔽', '取消'],
+    defaultId: 1,
+    cancelId: 1,
+    title: '加入屏蔽名单',
+    message: (target.kind === 'project' ? '屏蔽项目 ' : '屏蔽用户 ') + target.id + '？',
+    detail: target.title + '\n' + target.url
+  })
+  if (choice !== 0) return null
+  const res = target.kind === 'project'
+    ? store.addProject({ id: target.id, name: target.title, url: target.url })
+    : store.addUser({ id: target.id, url: target.url })
+  if (res && !res.ok) dialog.showMessageBoxSync(hostWin || site, { type: 'warning', message: res.error })
+  return res
 }
 
 function toggleRevealAll() {
   const next = !(store.snapshot().reveal && store.snapshot().reveal.all)
   store.setRevealAll(next)
   if (revealMenuItem) revealMenuItem.checked = next
-}
-
-function blockCurrentPage() {
-  const win = activeSiteWindow()
-  if (!win) return
-  const info = pure.parseSiteUrl(win.webContents.getURL())
-  const kind = info.projectId !== null ? 'project' : info.userId !== null ? 'user' : null
-  if (!kind) {
-    dialog.showMessageBoxSync(win, { type: 'info', message: '当前页面不是项目页或用户页，无法屏蔽。' })
-    return
-  }
-  const id = kind === 'project' ? info.projectId : info.userId
-  const title = win.getTitle()
-  const choice = dialog.showMessageBoxSync(win, {
-    type: 'question',
-    buttons: ['屏蔽', '取消'],
-    defaultId: 1,
-    cancelId: 1,
-    title: '加入屏蔽名单',
-    message: (kind === 'project' ? '屏蔽项目 ' : '屏蔽用户 ') + id + '？',
-    detail: title + '\n' + win.webContents.getURL()
-  })
-  if (choice !== 0) return
-  if (kind === 'project') store.addProject({ id: id, name: title, url: win.webContents.getURL() })
-  else store.addUser({ id: id, url: win.webContents.getURL() })
 }
 
 function pageContextMenu(win, params) {
@@ -89,7 +107,7 @@ function installAppMenu() {
     {
       label: '屏蔽',
       submenu: [
-        { label: '屏蔽当前项目 / 当前用户', accelerator: 'CmdOrCtrl+Shift+X', click: blockCurrentPage },
+        { label: '屏蔽当前项目 / 当前用户', accelerator: 'CmdOrCtrl+Shift+X', click: (item, win) => blockCurrentPage(win) },
         revealMenuItem = {
           label: '临时显示被屏蔽内容',
           type: 'checkbox',
@@ -143,4 +161,4 @@ function syncMenuRevealState() {
   if (revealMenuItem) revealMenuItem.checked = !!(store.snapshot().reveal && store.snapshot().reveal.all)
 }
 
-module.exports = { installAppMenu, pageContextMenu, syncMenuRevealState, toggleRevealAll }
+module.exports = { installAppMenu, pageContextMenu, syncMenuRevealState, toggleRevealAll, currentPageTarget, blockCurrentPage }
